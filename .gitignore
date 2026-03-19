@@ -1,2 +1,5 @@
 venv/
 KernelBench/
+*.log
+__pycache__/
+*.pyc
