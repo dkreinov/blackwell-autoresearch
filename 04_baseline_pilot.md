@@ -6,6 +6,37 @@
 **Scope:** Level 1 (single-kernel operators), all 100 problems
 **Precision:** fp32
 **Timing:** cuda_event, 5 warmup + 100 trials per problem
+**Power mode:** MAXN (mode 0) — all clocks locked at maximum
+
+---
+
+## Power & Clock State During This Run
+
+| Component | Frequency | Max Available | Governor | Status |
+|-----------|-----------|---------------|----------|--------|
+| GPU GPC (compute) | 1575 MHz | 1575 MHz | nvhost_podgov | Locked (min=max) |
+| GPU NVD (video) | 1692 MHz | 1692 MHz | nvhost_podgov | Locked (min=max) |
+| CPU (14 cores) | 2601 MHz | 2601 MHz | schedutil | At max |
+| Memory (LPDDR5X) | 4266 MHz | 4266 MHz | bpmp-bwmgr | At max |
+
+| Sensor | Value |
+|--------|-------|
+| Power mode | MAXN (ID=0) — all cores online, no GPU power gating, no freq caps |
+| GPU temperature | 34.5 C (idle) |
+| CPU temperature | 33.7 C (idle) |
+| Idle power (VIN) | ~26W |
+| GPU power gating mask | 64 (minimal — all compute partitions active) |
+
+### Available Power Modes on Thor
+
+| ID | Name | CPU Cores | CPU Max | GPU Max | GPU PG Mask | Notes |
+|----|------|-----------|---------|---------|-------------|-------|
+| 0 | MAXN | 14 | unlimited | 1575 MHz | 64 (minimal) | All resources, no limits |
+| 1 | 120W | 14 | 2601 MHz | 1386 MHz | 64 (minimal) | GPU freq capped |
+| 2 | 90W | 12 | 2601 MHz | 1530 MHz | 15873 (heavy) | GPU partitions disabled |
+| 3 | 70W | 12 | 1998 MHz | 1530 MHz | 15873 (heavy) | CPU + GPU constrained |
+
+**This baseline was collected at MAXN (mode 0) with all clocks at maximum.** See `05_power_characterization.md` for multi-mode comparison results.
 
 ---
 
