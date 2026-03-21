@@ -277,45 +277,49 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 
 ## 7. Loop Protocol
 
+All commands run via SSH to Thor using `thor_agent.sh`:
+
+```bash
+SSH="ssh -o StrictHostKeyChecking=no nvidia@nvidia-thor-01"
+AGENT="bash ~/thor_kernelbench_work/thor_agent.sh"
+```
+
 ### Before Each Experiment
 1. Read `findings.md` — current best, what's been tried, active ideas, dead ends
-2. Read the KernelBench problem (Model class, get_inputs, forward signature)
-3. Pick ONE optimization idea (from findings.md or invent one based on hardware knowledge)
+2. Read the problem: `$SSH "$AGENT read-problem <id>"`
+3. Read the baseline: `$SSH "$AGENT baseline <id>"`
+4. Pick ONE optimization idea (from findings.md or invent one based on hardware knowledge)
 
 ### Execute
-4. Write the CUDA kernel + ModelNew Python wrapper
-5. Compile on Thor (TORCH_CUDA_ARCH_LIST=11.0)
-6. Test correctness (5 trials with random inputs, atol=1e-2)
-7. Benchmark: 5 warmup + 100 trials, cuda_event timing
-8. Read power: tegrastats VDD_GPU during benchmark
+5. Write the CUDA kernel locally as a Python file with `ModelNew` class
+6. SCP to Thor: `scp <file> nvidia@nvidia-thor-01:~/thor_kernelbench_work/kernels/<name>.py`
+7. Evaluate: `$SSH "$AGENT eval-kernel kernels/<name>.py <id>"`
+   - This compiles (sm_110), tests correctness (5 trials), benchmarks (100 trials)
+   - Output: `[OK] Custom: X.XXms Speedup: X.XXx` or `[COMPILE_ERROR]` or `[INCORRECT]`
+8. Read power: `$SSH "$AGENT power"`
 
 ### Decide
-9. **Improved** (faster than best so far): keep, record in findings.md, save kernel
-10. **Same or worse**: discard, one-line note in findings.md dead ends, start next
-11. **Compile error**: read error, fix if simple (typo/syntax), discard if fundamental approach problem
-12. **Incorrect output**: discard immediately — math was wrong
-13. **Hang/timeout**: kill after 120s, discard, move on
+9. **[OK] with speedup > best**: keep, record in findings.md, iterate to improve
+10. **[OK] but no improvement**: stop iterating on this problem, move to next
+11. **[COMPILE_ERROR]**: read the error, fix if simple (typo/syntax), discard if fundamental
+12. **[INCORRECT]**: discard immediately — math was wrong
+13. **[ERROR] or timeout**: discard, move on
 
 ### Discipline
 - ONE change per experiment
 - Read compile errors carefully — they contain sm_110-specific information
 - If ideas run out: simplify the kernel, remove unnecessary shared memory, try vectorized loads
+- Start with highest-baseline-time problems (most room to improve)
 
 ---
 
 ## 8. Power Monitoring
 
-### Reading Power During Benchmark
+### Reading Power
 
 ```bash
-# Start tegrastats daemon (2-second interval)
-tegrastats --start --interval 2000 --logfile /tmp/power.log
-
-# ... run benchmark ...
-
-# Stop and read
-tegrastats --stop
-grep VDD_GPU /tmp/power.log
+ssh nvidia@nvidia-thor-01 "bash ~/thor_kernelbench_work/thor_agent.sh power"
+# Returns: VDD_GPU readings + gpu/cpu temperature
 ```
 
 ### tegrastats Line Format
