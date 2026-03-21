@@ -50,6 +50,69 @@ One failure in both modes: problem #95 (CrossEntropyLoss) -- `nll_loss` kernel n
 
 ---
 
+
+---
+
+## Phase 6 — LLM Kernel Generation Research
+
+### Transfer Study: Sakana AI H100-Optimized Kernels on Thor
+
+We evaluated 63 kernels from the [Sakana AI CUDA Engineer Archive](https://huggingface.co/SakanaAI) — kernels optimized for H100 (HBM, PCIe) — on Thor's unified LPDDR5X memory to understand cross-architecture transfer.
+
+| Metric | Count | % |
+|--------|-------|---|
+| Compiled + correct | 32 | 51% |
+| Compile / runtime fail | 26 | 41% |
+| Incorrect output | 5 | 8% |
+
+Of the 32 correct kernels:
+
+| Outcome | Count | % | Median speedup |
+|---------|-------|---|----------------|
+| Transfers well (≥1.0x faster on Thor) | 23 | 72% | — |
+| Backfires (slower on Thor) | 9 | 28% | — |
+| **All correct** | **32** | — | **1.195x** |
+
+**Per-category breakdown:**
+
+| Category | n | Faster | Median speedup | Key finding |
+|----------|---|--------|----------------|-------------|
+| Normalization | 4 | 4/4 | **2.35x** | Best transfer — bandwidth-bound, L2 locality helps |
+| Activation | 10 | 9/10 | **1.23x** | Near-perfect transfer — element-wise, no memory pattern dependency |
+| Reduction | 9 | 2/9 | **0.75x** | Consistently backfires — HBM tiling hurts on unified LPDDR5X |
+
+**Notable results:**
+- Problem 12 (Diagonal Matmul): 39.95x speedup on Thor — diagonal structure exploits unified memory better than HBM
+- Problem 40 (LayerNorm): 2.57x on Thor vs 8.60x on H100 — still 2.57x, normalization transfers well
+- Problem 47 (Sum Reduction): 0.38x on Thor — shared-memory warp reduction adds overhead on unified memory
+
+**Key insight:** H100 reduction kernels optimize for HBM coalescing and warp-level synchronization — these patterns add overhead on Thor's unified LPDDR5X where the cost model is different.
+
+### Autoresearch Infrastructure
+
+An LLM kernel autoresearch loop is set up following the [VMP/Mobileye pattern](https://x.com/karpathy/status/2015883857489522876):
+
+| File | Purpose |
+|------|---------|
+| `program.md` | Facts-only hardware reference for the agent (Thor specs, memory model, empirical data) |
+| `thor_agent.sh` | Remote helper — wraps `eval_kernel_against_ref`, tegrastats, dataset access |
+| `findings.md` | Agent-writable research log — priority problems, completed experiments, dead ends |
+| `.claude/commands/thor-autoresearch.md` | Slash command to invoke the research loop in Claude Code |
+
+The loop runs directly in Claude Code (no separate API script) — the agent reads `program.md`, picks a problem, writes a CUDA kernel, SCPs it to Thor, evals via `thor_agent.sh`, and iterates.
+
+**Priority targets** (highest baseline time = most room to improve):
+
+| ID | Problem | Baseline (ms) | Transfer Study |
+|----|---------|--------------|----------------|
+| 30 | Softsign | 197.0 | Sakana 1.78x ✓ |
+| 38 | L1Norm | 193.0 | Sakana 2.42x ✓ |
+| 76 | conv_standard_1D_dilated_strided | 181.0 | Compile fail |
+| 36 | RMSNorm | 172.0 | Sakana 2.28x ✓ |
+| 97 | ScaledDotProductAttention | 143.0 | Not in Sakana |
+
+---
+
 ## Why This Matters
 
 1. **First KernelBench results on Jetson/Blackwell.** No prior published baselines exist for sm_110 on a Tegra SoC. This data establishes the performance floor for LLM-generated kernel optimization on edge Blackwell hardware.
@@ -66,6 +129,10 @@ One failure in both modes: problem #95 (CrossEntropyLoss) -- `nll_loss` kernel n
 .
 |-- README.md                           # This file
 |-- LICENSE                             # MIT License
+|-- program.md                          # Facts-only hardware reference for autoresearch agent
+|-- findings.md                         # Agent research log (updated per-experiment)
+|-- thor_agent.sh                       # Remote helper script for kernel eval on Thor
+|-- .claude/commands/thor-autoresearch.md  # Slash command for the autoresearch loop
 |-- reports/
 |   |-- 00_thor_env_report.md           # Raw environment inventory (nvidia-smi, lscpu, etc.)
 |   |-- 01_env_and_repo_audit.md        # Phase 1: compatibility analysis and patch plan
@@ -77,11 +144,17 @@ One failure in both modes: problem #95 (CrossEntropyLoss) -- `nll_loss` kernel n
 |   |-- run_baseline_timing.py          # Baseline timing with timeout/OOM handling
 |   |-- run_power_sweep.py              # Power mode sweep with tegrastats monitoring
 |   |-- analyze_baseline.py             # Stats and per-category analysis
+|   |-- compare_thor_h100.py            # Thor vs H100 PCIe baseline comparison
+|   |-- eval_sakana_kernels.py          # Transfer study: Sakana H100 kernels on Thor sm_110
+|   |-- analyze_transfer.py             # Transfer analysis — per-category breakdown
+|   |-- run_agentic_eval.py             # Two-pass agentic kernel eval (reproducible benchmark)
 |-- results/
 |   |-- Thor_AGX/
 |       |-- baseline_level1.json        # MAXN baseline (99 problems, no power data)
 |       |-- power_MAXN_level1_1-100.json  # MAXN with tegrastats power monitoring
 |       |-- power_120W_level1_1-100.json  # 120W with tegrastats power monitoring
+|       |-- sakana_transfer_level1.json # Transfer study: 63 Sakana kernels on Thor
+|-- kernels/                            # Agent-written CUDA kernels (populated by autoresearch loop)
 ```
 
 ---
@@ -171,7 +244,8 @@ See [`reports/02_thor_compatibility_patches.md`](reports/02_thor_compatibility_p
 ## Roadmap
 
 - [ ] **Level 2 & 3 baselines** -- Run Level 2 (operator fusion, 100 problems) and Level 3 (full architectures, 50 problems)
-- [ ] **LLM kernel generation** -- Configure API keys, run generate-and-eval pipeline to produce optimized CUDA kernels and measure speedup vs baseline
+- [x] **LLM kernel generation infrastructure** -- thor_agent.sh + program.md + findings.md + autoresearch slash command ready; transfer study (72% of H100 kernels work on Thor) complete
+- [ ] **LLM autoresearch loop** -- Run `/thor-autoresearch` to iteratively optimize high-baseline-time problems (Softsign 197ms, L1Norm 193ms, ...)
 - [ ] **torch.compile baselines** -- Compare eager vs Inductor-compiled performance
 - [ ] **H100/L40S comparison** -- Cross-reference with published datacenter baselines
 - [ ] **GPU clock sweep** -- Fine-grained clock-vs-performance curves within MAXN mode
