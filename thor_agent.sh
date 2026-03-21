@@ -94,8 +94,12 @@ cmd_eval_kernel() {
     local run_log="$RESULTS/eval_run.log"
 
     if [ ! -f "$kernel_file" ]; then
-        # Try relative to kernels dir
-        kernel_file="$KERNELS_DIR/$kernel_file"
+        # Try relative to work dir
+        if [ -f "$WORK/$kernel_file" ]; then
+            kernel_file="$WORK/$kernel_file"
+        elif [ -f "$KERNELS_DIR/$(basename "$kernel_file")" ]; then
+            kernel_file="$KERNELS_DIR/$(basename "$kernel_file")"
+        fi
     fi
     [ -f "$kernel_file" ] || { fail "Kernel file not found: $kernel_file"; return 1; }
 
