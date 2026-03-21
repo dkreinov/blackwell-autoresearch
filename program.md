@@ -309,7 +309,6 @@ AGENT="bash ~/thor_kernelbench_work/thor_agent.sh"
 - ONE change per experiment
 - Read compile errors carefully — they contain sm_110-specific information
 - If ideas run out: simplify the kernel, remove unnecessary shared memory, try vectorized loads
-- Start with highest-baseline-time problems (most room to improve)
 
 ---
 
