@@ -399,4 +399,7 @@ Tensor: (32768, 32768). Exclusive prefix sum along dim=1.
 - FAIL v1: sequential scan right-to-left, 256 threads (137ms 0.803x) — reverse reads not coalesced
 - FAIL v2: 1024 threads (137ms 0.803x) — same issue
 
-**p91: no improvement found. Reverse sequential reads kill coalescing. PyTorch's flip+cumsum+flip is hard to beat.**
+| 1 | 110.0 | 1.000x | custom fwd-order kernel non-coalesced load, same as baseline |
+| 2 | 63.80 | 1.724x | tile-based coalesced: 32 tiles R-to-L, warp rev-incl-scan + carry, no flip |
+
+**p91 best: v2 1.724x (63.80ms). Key: coalesced tile loads, no flip overhead.**

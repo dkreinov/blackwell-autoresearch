@@ -469,5 +469,26 @@
         "note": "torch.cumsum + shift \u05d2\u20ac\u201d avoids narrow+cat overhead"
       }
     ]
+  },
+  "91": {
+    "name": "CumsumReverse",
+    "baseline_ms": 110.0,
+    "best_ms": 63.8,
+    "best_speedup": 1.724,
+    "iterations": 2,
+    "history": [
+      {
+        "version": 1,
+        "ms": 110.0,
+        "speedup": 1.0,
+        "note": "custom fwd-order kernel (non-coalesced load) \u2014 same as baseline"
+      },
+      {
+        "version": 2,
+        "ms": 63.8,
+        "speedup": 1.724,
+        "note": "tile-based coalesced: 32 tiles R\u2192L, warp-level rev-incl-scan + carry, no flip()"
+      }
+    ]
   }
 }
