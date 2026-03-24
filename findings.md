@@ -268,7 +268,9 @@ Features strided by spatial_size (262144), but adjacent threads access adjacent 
 | 9 | 77.50 | 2.219x | __launch_bounds__(512,1) — 128 regs/thread, no spills |
 - FAIL v10: __launch_bounds__(512,2) (97.6ms 1.762x) — forces ≤64 regs/thread, causes spills
 
-**p36 best: v9 2.219x (77.50ms). Key: single-pass register-cached, 512 threads, launch_bounds(512,1).**
+| 11 | 77.40 | 2.222x | 4 independent FMA accumulators (ss0..ss3) — breaks dependency chain, enables ILP |
+
+**p36 best: v11 2.222x (77.40ms). Key: single-pass register-cached, 512 threads, launch_bounds(512,1), 4 independent accumulators.**
 
 ---
 

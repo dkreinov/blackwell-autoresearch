@@ -6,8 +6,9 @@ cuda_source = """
 #include <torch/extension.h>
 #include <cuda_runtime.h>
 
-// v6 with __launch_bounds__ to tell compiler max 512 threads, min 1 block.
-// This allows compiler to use up to 128 registers/thread (65536/512).
+// v11: 4 independent FMA accumulators to break dependency chain and enable ILP.
+// v9 had sum_sq = fmaf(v0,v0,sum_sq); fmaf(v1,v1,sum_sq); etc. — serialized.
+// Now: ss0 += v0^2, ss1 += v1^2, ss2 += v2^2, ss3 += v3^2 → all independent.
 __global__ __launch_bounds__(512, 1)
 void rmsnorm_kernel(const float* __restrict__ x, float* __restrict__ out,
                     int batch, int spatial, float eps) {
@@ -20,11 +21,11 @@ void rmsnorm_kernel(const float* __restrict__ x, float* __restrict__ out,
     long long base = (long long)b * 64 * spatial + s;
     long long stride = (long long)spatial;
 
-    float sum_sq = 0.0f;
+    float ss0 = 0.0f, ss1 = 0.0f, ss2 = 0.0f, ss3 = 0.0f;
     float vals[64];
 
     for (int f = 0; f < 64; f += 4) {
-        float v0 = x[base + (long long)(f) * stride];
+        float v0 = x[base + (long long)(f)   * stride];
         float v1 = x[base + (long long)(f+1) * stride];
         float v2 = x[base + (long long)(f+2) * stride];
         float v3 = x[base + (long long)(f+3) * stride];
@@ -32,16 +33,17 @@ void rmsnorm_kernel(const float* __restrict__ x, float* __restrict__ out,
         vals[f+1] = v1;
         vals[f+2] = v2;
         vals[f+3] = v3;
-        sum_sq = fmaf(v0, v0, sum_sq);
-        sum_sq = fmaf(v1, v1, sum_sq);
-        sum_sq = fmaf(v2, v2, sum_sq);
-        sum_sq = fmaf(v3, v3, sum_sq);
+        ss0 = fmaf(v0, v0, ss0);
+        ss1 = fmaf(v1, v1, ss1);
+        ss2 = fmaf(v2, v2, ss2);
+        ss3 = fmaf(v3, v3, ss3);
     }
 
+    float sum_sq = (ss0 + ss1) + (ss2 + ss3);
     float inv_rms = rsqrtf(fmaf(sum_sq, 0.015625f, eps));
 
     for (int f = 0; f < 64; f += 4) {
-        out[base + (long long)(f) * stride]   = vals[f]   * inv_rms;
+        out[base + (long long)(f)   * stride] = vals[f]   * inv_rms;
         out[base + (long long)(f+1) * stride] = vals[f+1] * inv_rms;
         out[base + (long long)(f+2) * stride] = vals[f+2] * inv_rms;
         out[base + (long long)(f+3) * stride] = vals[f+3] * inv_rms;
@@ -66,7 +68,7 @@ torch::Tensor rmsnorm_cuda(torch::Tensor x, float eps) {
 cpp_source = "torch::Tensor rmsnorm_cuda(torch::Tensor x, float eps);"
 
 rmsnorm_module = load_inline(
-    name='rmsnorm_v9',
+    name='rmsnorm_v11',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
     functions=['rmsnorm_cuda'],
