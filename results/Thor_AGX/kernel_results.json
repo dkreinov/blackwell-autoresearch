@@ -259,5 +259,185 @@
         "note": "float4 single-pass, 1024 threads, exact grid, clamp(-1,1)"
       }
     ]
+  },
+  "38": {
+    "name": "L1Norm",
+    "baseline_ms": 193.0,
+    "best_ms": 90.6,
+    "best_speedup": 2.13,
+    "iterations": 2,
+    "history": [
+      {
+        "version": 1,
+        "ms": 105.0,
+        "speedup": 1.838,
+        "note": "fused 3 PyTorch passes into 1 kernel, scalar loads, warp shuffle reduction, 1024 threads"
+      },
+      {
+        "version": 2,
+        "ms": 90.6,
+        "speedup": 2.13,
+        "note": "float4 vectorized loads with per-row alignment handling"
+      }
+    ]
+  },
+  "36": {
+    "name": "RMSNorm",
+    "baseline_ms": 172.0,
+    "best_ms": 77.5,
+    "best_speedup": 2.219,
+    "iterations": 9,
+    "history": [
+      {
+        "version": 1,
+        "ms": 85.8,
+        "speedup": 2.005,
+        "note": "single-pass, 64 features cached in registers, 256 threads, rsqrtf"
+      },
+      {
+        "version": 5,
+        "ms": 79.6,
+        "speedup": 2.161,
+        "note": "512 threads — better thread-level parallelism"
+      },
+      {
+        "version": 6,
+        "ms": 78.4,
+        "speedup": 2.194,
+        "note": "manual 4-way unroll with fmaf for sum_sq accumulation"
+      },
+      {
+        "version": 9,
+        "ms": 77.5,
+        "speedup": 2.219,
+        "note": "__launch_bounds__(512,1) — 128 regs/thread, no spills"
+      }
+    ]
+  },
+  "34": {
+    "name": "InstanceNorm",
+    "baseline_ms": 135.0,
+    "best_ms": 97.9,
+    "best_speedup": 1.379,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 97.9,
+        "speedup": 1.379,
+        "note": "fused 2-pass, 1 block per instance, float4, warp shuffle reduction, 1024 threads"
+      }
+    ]
+  },
+  "23": {
+    "name": "Softmax",
+    "baseline_ms": 100.0,
+    "best_ms": 92.1,
+    "best_speedup": 1.086,
+    "iterations": 5,
+    "history": [
+      {
+        "version": 2,
+        "ms": 92.2,
+        "speedup": 1.085,
+        "note": "online softmax (Milakov-Gimelshein) fusing max+sum in 1 pass, float4, 1024 threads"
+      },
+      {
+        "version": 5,
+        "ms": 92.1,
+        "speedup": 1.086,
+        "note": "batched float4 online update — 1 max update per float4 instead of 4"
+      }
+    ]
+  },
+  "24": {
+    "name": "LogSoftmax",
+    "baseline_ms": 110.0,
+    "best_ms": 92.3,
+    "best_speedup": 1.192,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 92.3,
+        "speedup": 1.192,
+        "note": "online softmax + cheap normalize (x - max - log(sum)), no __expf in pass 2"
+      }
+    ]
+  },
+  "39": {
+    "name": "L2Norm",
+    "baseline_ms": 118.0,
+    "best_ms": 90.5,
+    "best_speedup": 1.304,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 90.5,
+        "speedup": 1.304,
+        "note": "fused 2-pass, per-row sum(x^2) reduction, float4 aligned, rsqrtf, 1024 threads"
+      }
+    ]
+  },
+  "37": {
+    "name": "FrobeniusNorm",
+    "baseline_ms": 98.5,
+    "best_ms": 96.3,
+    "best_speedup": 1.023,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 96.3,
+        "speedup": 1.023,
+        "note": "global sum(x^2) with multi-block atomicAdd + elementwise normalize, float4"
+      }
+    ]
+  },
+  "94": {
+    "name": "MSELoss",
+    "baseline_ms": 103.0,
+    "best_ms": 37.8,
+    "best_speedup": 2.725,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 37.8,
+        "speedup": 2.725,
+        "note": "fused single-pass (diff+square+reduce), float4, multi-block atomicAdd"
+      }
+    ]
+  },
+  "100": {
+    "name": "HingeLoss",
+    "baseline_ms": 122.0,
+    "best_ms": 19.3,
+    "best_speedup": 6.321,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 19.3,
+        "speedup": 6.321,
+        "note": "fused single-pass with broadcast target, clamp+reduce, atomicAdd"
+      }
+    ]
+  },
+  "92": {
+    "name": "CumsumExclusive",
+    "baseline_ms": 122.0,
+    "best_ms": 121.0,
+    "best_speedup": 1.008,
+    "iterations": 3,
+    "history": [
+      {
+        "version": 3,
+        "ms": 121.0,
+        "speedup": 1.008,
+        "note": "torch.cumsum + shift — avoids narrow+cat overhead"
+      }
+    ]
   }
 }

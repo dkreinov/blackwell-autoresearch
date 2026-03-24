@@ -222,3 +222,166 @@ Tensor: 8192×8192 = 67,108,864 elements (268MB). PyTorch baseline does 7+ passe
 ### p28 HardSigmoid round 2
 | 2 | 55.60 | 1.020x | fmaf(x,1/6,0.5) = (x+3)/6 — FMA saves add instruction |
 **p28 updated: v2 1.020x (55.60ms).**
+
+---
+
+## Phase 8: Heavy Kernels (Norms, Reductions, Convolutions, Scans)
+
+---
+
+## p38 L1Norm (baseline 193.0ms)
+
+Tensor: 32768×65535 = 2.1B elements (8.6GB). PyTorch does 3 passes: abs → mean(dim=1) → divide.
+Fused to 1 kernel, 2 data passes (read for sum, read+write for normalize). Rows not float4-aligned (dim=65535).
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 105.00 | 1.838x | fused 3→1 kernel, scalar loads, warp shuffle reduction, 1024 threads |
+| 2 | 90.60 | 2.130x | float4 vectorized loads with per-row alignment handling |
+- FAIL v3: multi-block per row (4 blocks) + atomicAdd + separate normalize kernel (146ms 1.322x) — 2 kernel launches + atomics overhead
+- FAIL v4: 512 threads (108ms 1.787x) — fewer threads = more stride loop iterations
+- FAIL v5: manual 4-element scalar unroll (94ms 2.053x) — worse than float4 cast
+- FAIL v6: 2x float4 ILP unroll (INCORRECT) — unroll boundary bug
+- FAIL v7: 256 threads (142ms 1.359x) — even worse, too many stride iterations
+- FAIL v8: pure scalar both passes (106ms 1.821x) — confirms float4 alignment gives ~15% gain
+
+**p38 best: v2 2.130x (90.60ms). Near memory bandwidth floor: 8.6GB × 3 passes = 25.7GB, ~283 GB/s effective.**
+
+---
+
+## p36 RMSNorm (baseline 172.0ms)
+
+Tensor: (112, 64, 512, 512) = 1.88B elements (7.5GB). Reduce over dim=1 (features=64).
+Small reduction dim → each thread handles one spatial position, loops over 64 features.
+Features strided by spatial_size (262144), but adjacent threads access adjacent spatial positions = coalesced.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 85.80 | 2.005x | single-pass, 64 vals cached in registers, 256 threads, rsqrtf |
+- FAIL v2: two-pass 512 threads no cache (87.9ms 1.957x) — re-reading misses L2
+- FAIL v3: 128 threads (89.8ms 1.915x) — not enough parallelism
+- FAIL v4: 1024 threads (INCORRECT) — register spill at 1024×80+ regs/block
+| 5 | 79.60 | 2.161x | 512 threads — better thread-level parallelism |
+| 6 | 78.40 | 2.194x | manual 4-way unroll with fmaf |
+- FAIL v7: two-pass 512 threads (97.8ms 1.759x) — L2 misses for strided re-reads
+- FAIL v8: 384 threads (85.6ms 2.009x) — fewer threads, less parallelism
+| 9 | 77.50 | 2.219x | __launch_bounds__(512,1) — 128 regs/thread, no spills |
+- FAIL v10: __launch_bounds__(512,2) (97.6ms 1.762x) — forces ≤64 regs/thread, causes spills
+
+**p36 best: v9 2.219x (77.50ms). Key: single-pass register-cached, 512 threads, launch_bounds(512,1).**
+
+---
+
+## p34 InstanceNorm (baseline 135.0ms)
+
+Tensor: (112, 64, 512, 512) = 1.88B elements (7.5GB). Normalize each (batch, feature) instance over H×W=262144.
+7168 instances, each 262144 contiguous elements — perfect for float4.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 97.90 | 1.379x | fused 2-pass, 1 block/instance, float4, warp shuffle, 1024 threads |
+- FAIL v2: fmaf for sum_sq (98.0ms) — same, memory-bound
+- FAIL v3: 512 threads (109ms 1.239x) — more stride loop iterations
+- FAIL v4: FMA normalize (98.1ms) — compute not the bottleneck
+
+**p34 best: v1 1.379x (97.90ms). Memory-bound: 7.5GB × 3 passes ≈ 22.5GB.**
+
+---
+
+## p23 Softmax (baseline 100.0ms)
+
+Tensor: (4096, 393216). 3-stage: max → exp+sum → normalize. Key: reducing number of data passes.
+dim=393216 divisible by 4 → float4 works directly.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+- FAIL v1: 3-pass (max, exp+sum, normalize) — recomputes __expf in pass 3 (116ms 0.862x)
+| 2 | 92.20 | 1.085x | online softmax (Milakov-Gimelshein), 2 data passes |
+- FAIL v3: max + exp→output + normalize in-place (130ms 0.769x) — extra read+write for in-place pass
+- FAIL v4: max + exp+sum + normalize (116ms 0.862x) — 3 reads, same as v1
+| 5 | 92.10 | 1.086x | batched float4 online update — 1 max correction per float4 |
+
+**p23 best: v5 1.086x (92.10ms). Online softmax saves 1 read pass vs 3-pass. 2 reads + 1 write = 18.3GB.**
+
+---
+
+## p24 LogSoftmax (baseline 110.0ms)
+
+Same tensor as p23: (4096, 393216). LogSoftmax = x - max - log(sum(exp(x-max))).
+Normalize pass is cheaper than Softmax — no __expf, just subtraction.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 92.30 | 1.192x | online softmax + x - max - log(sum) normalize |
+
+**p24 best: v1 1.192x (92.30ms). Same time as p23 — pass 1 (online softmax) dominates, pass 2 is negligible.**
+
+---
+
+## p39 L2Norm (baseline 118.0ms)
+
+Same shape as p38: (32768, 65535). `x / norm(x, p=2, dim=1)` = `x * rsqrt(sum(x^2, dim=1))`.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 90.50 | 1.304x | fused 2-pass, per-row sum(x^2), float4 aligned, rsqrtf, 1024 threads |
+
+**p39 best: v1 1.304x (90.50ms). Same floor as p38 L1Norm — identical data movement pattern.**
+
+---
+
+## p37 FrobeniusNorm (baseline 98.5ms)
+
+Tensor: (112, 64, 512, 512) = 1.88B elements. Global norm then divide.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 96.30 | 1.023x | multi-block atomicAdd + elementwise normalize, float4 |
+
+**p37 best: v1 1.023x (96.30ms). Minimal gain — PyTorch already efficient for global reduction.**
+
+---
+
+## p94 MSELoss (baseline 103.0ms)
+
+Tensors: (32768, 32768) = 1.07B elements each. `mean((pred-target)^2)`.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 37.80 | 2.725x | fused single-pass: read both, diff+square+reduce, float4, atomicAdd |
+
+**p94 best: v1 2.725x (37.80ms). Key win: fuse 3 PyTorch ops (sub, pow, mean) into 1 kernel, 1 pass.**
+
+---
+
+## p100 HingeLoss (baseline 122.0ms)
+
+Tensors: pred (32768, 32768), target (32768,) broadcast. `mean(clamp(1 - pred*target, 0))`.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 19.30 | 6.321x | fused single-pass, broadcast target, clamp+reduce, atomicAdd |
+
+**p100 best: v1 6.321x (19.30ms). Key win: fuse 4 PyTorch ops (mul, sub, clamp, mean) into 1 kernel.**
+**Target broadcast cached in L2 (128KB fits easily in 32MB L2).**
+
+---
+
+## p92 CumsumExclusive (baseline 122.0ms)
+
+Tensor: (32768, 32768). Exclusive prefix sum along dim=1.
+
+- FAIL v1: sequential scan 1 thread/row, 256 threads (130ms 0.938x) — bad coalescing
+- FAIL v2: block-per-row parallel prefix with 128KB shmem (236ms 0.517x) — shmem overhead
+| 3 | 121.00 | 1.008x | torch.cumsum + shift — avoids narrow+cat overhead |
+
+**p92 best: v3 1.008x (121ms). Scan problems hard to beat PyTorch's CUB implementation.**
+
+---
+
+## p91 CumsumReverse (baseline 110.0ms)
+
+- FAIL v1: sequential scan right-to-left, 256 threads (137ms 0.803x) — reverse reads not coalesced
+- FAIL v2: 1024 threads (137ms 0.803x) — same issue
+
+**p91: no improvement found. Reverse sequential reads kill coalescing. PyTorch's flip+cumsum+flip is hard to beat.**

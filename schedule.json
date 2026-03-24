@@ -1,12 +1,15 @@
 {
-  "order": [25, 30, 88, 19, 20, 21, 22, 26, 27, 28, 29, 31, 32],
+  "order": [38, 36, 34, 23, 24, 39, 35, 37, 33, 76, 63, 64, 84, 92, 91, 93, 97, 100, 94],
   "names": {
-    "19": "ReLU", "20": "LeakyReLU", "21": "Sigmoid", "22": "Tanh",
-    "25": "Swish", "26": "GELU", "27": "SELU", "28": "HardSigmoid",
-    "29": "Softplus", "30": "Softsign", "31": "ELU", "32": "HardTanh",
-    "88": "MinGPTNewGelu"
+    "38": "L1Norm", "36": "RMSNorm", "34": "InstanceNorm",
+    "23": "Softmax", "24": "LogSoftmax", "39": "L2Norm",
+    "35": "GroupNorm", "37": "FrobeniusNorm", "33": "BatchNorm",
+    "76": "Conv1D_dilated_strided", "63": "Conv2D_large",
+    "64": "ConvTranspose1D", "84": "DepthwiseConv2D",
+    "92": "CumsumExclusive", "91": "CumsumReverse", "93": "MaskedCumsum",
+    "97": "ScaledDotProductAttention", "100": "HingeLoss", "94": "MSELoss"
   },
   "time_per_activation_s": 3600,
   "max_experiment_s": 120,
-  "notes": "Priority: Swish/Softsign/MinGPTNewGelu first (multi-pass PyTorch, most room). Then 57ms group."
+  "notes": "Phase 8: Heavy kernels — norms/reductions first, then convolutions, scans, attention/losses."
 }
