@@ -6,7 +6,7 @@ Optimize CUDA kernels from KernelBench Level 1 on NVIDIA Jetson AGX Thor (Blackw
 
 - **Primary metric**: speedup vs PyTorch baseline (higher = better)
 - **Evaluation**: compile with nvcc (sm_110), test correctness (3 trials), benchmark (20 trials, cuda_event)
-- **Current category**: ACTIVATIONS (13 problems: 19-22, 25-32, 88)
+- **Current category**: HEAVY KERNELS (norms, losses, softmax, scans — see schedule.json)
 - **Iteration**: per-kernel optimization via `eval_kernel.py` — one problem at a time, round-robin schedule
 - **One kernel per experiment**: each KernelBench problem has one PyTorch Model → write one optimized CUDA replacement (ModelNew)
 
@@ -129,36 +129,19 @@ Run experiments continuously until externally interrupted. Do not pause for conf
 
 ---
 
-## 5. Activation Loop Protocol
+## 5. Experiment Loop Protocol
 
-### Category: Activations (13 problems)
+### Current Schedule
 
-All 13 are elementwise `x -> f(x)` ops on a 4096×393216 float32 tensor (except pid 88: 8192×8192).
+`schedule.json` defines the problem order. Current phase: heavy kernels (norms, reductions, losses, softmax, scans).
 Each problem has its own independently-evolving kernel file.
 
-Current best speedups are tracked in `results/Thor_AGX/kernel_results.json` (source of truth).
-
-| PID | Name | Baseline (ms) | Kernel File |
-|-----|------|---------------|-------------|
-| 19 | ReLU | 57.5 | kernels/p19_relu.py |
-| 20 | LeakyReLU | 56.6 | kernels/p20_leakyrelu.py |
-| 21 | Sigmoid | 56.6 | kernels/p21_sigmoid.py |
-| 22 | Tanh | 56.8 | kernels/p22_tanh_act.py |
-| 25 | Swish | 142.0 | kernels/p25_swish.py |
-| 26 | GELU | 56.8 | kernels/p26_gelu.py |
-| 27 | SELU | 56.8 | kernels/p27_selu.py |
-| 28 | HardSigmoid | 56.7 | kernels/p28_hardsigmoid.py |
-| 29 | Softplus | 56.5 | kernels/p29_softplus.py |
-| 30 | Softsign | 197.0 | kernels/p30_softsign.py |
-| 31 | ELU | 56.5 | kernels/p31_elu.py |
-| 32 | HardTanh | 56.7 | kernels/p32_hardtanh.py |
-| 88 | MinGPTNewGelu | 19.8 | kernels/p88_mingptnewgelu.py |
-
-[Source: baseline_level1.json, MAXN mode, 100 trials, cuda_event timing]
+Source of truth: `results/Thor_AGX/kernel_results.json` (per-problem best speedup + version history).
 
 ### Files
 
 - `kernels/p{pid}_{name}.py` — current best kernel (evolves in place, git tracks history)
+- `kernels/p{pid}_{name}_candidate.py` — temporary candidate being tested (MUST be deleted after each test)
 - `scripts/eval_kernel.py` — single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{N}_*.py`
 - `results/Thor_AGX/kernel_results.json` — per-problem best speedup + version history
 - `findings.md` — per-problem experiment results and failures
@@ -166,10 +149,10 @@ Current best speedups are tracked in `results/Thor_AGX/kernel_results.json` (sou
 
 ### Loop (run autonomously, do not pause)
 
-**Schedule**: `schedule.json` defines the order and timing. Spend 1 hour per activation in round-robin.
+**Schedule**: `schedule.json` defines the order and timing. Spend 1 hour per problem in round-robin.
 Max 2 minutes per experiment (eval times out at 120s).
 
-**Per-experiment cycle** (repeat until 1hr on current activation, then advance schedule):
+**Per-experiment cycle** (repeat until 1hr on current problem, then advance schedule):
 
 1. Read `findings.md` section for current problem — what has been tried, what failed
 2. Read `results/Thor_AGX/kernel_results.json` — current best speedup for this problem
@@ -182,23 +165,32 @@ Max 2 minutes per experiment (eval times out at 120s).
 6. Run: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{pid}_{name}_candidate.py`
    - Must complete in <120s or it's discarded
 7. **If result is correct AND faster than current best**:
-   - Overwrite `kernels/p{pid}_{name}.py` with the candidate
+   - Copy candidate over `kernels/p{pid}_{name}.py`
+   - **Delete the candidate file immediately**
    - Update `results/Thor_AGX/kernel_results.json` (best_speedup, best_ms, iterations, history)
    - Update `findings.md` section: add row to table, note what worked
-   - Commit on Thor: `git add kernels/p{pid}_{name}.py results/Thor_AGX/kernel_results.json findings.md`
+   - **Commit and push immediately**:
+     `git add kernels/p{pid}_{name}.py results/Thor_AGX/kernel_results.json findings.md`
      `git commit -m "p{pid}: {name} v{N} — <change>, {old}x -> {new}x"`
-   - Delete the candidate file
+     `git push origin main`
 8. **If result is slower, incorrect, or times out**:
-   - Discard candidate, do NOT overwrite current best
+   - **Delete the candidate file immediately**
+   - Do NOT overwrite current best
    - Note the failure in findings.md (one line: what was tried and why it failed)
-   - Delete the candidate file
 9. Go to step 1 for the same problem (until 1hr elapsed, then advance schedule)
+
+### CRITICAL: Cleanup Discipline
+
+- **No _candidate.py files should survive between experiments.** Delete after EVERY test, pass or fail.
+- **Commit each improvement individually**, not in batches. Each commit = one verified speedup.
+- **Push after each commit.** Do not accumulate unpushed commits.
+- Run `--clean` or `ls kernels/*_candidate.py` to check for stale candidates before starting a session.
 
 ### Schedule Enforcement
 
-- Track start time when switching to a new activation
-- After 3600s on current activation: advance to next in `schedule.json` order
-- After all 13: round-robin back to first
+- Track start time when switching to a new problem
+- After 3600s on current problem: advance to next in `schedule.json` order
+- After all problems: round-robin back to first
 - Only the user decides when to stop the loop entirely
 
 ### Commit Format
