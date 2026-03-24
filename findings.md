@@ -270,7 +270,9 @@ Features strided by spatial_size (262144), but adjacent threads access adjacent 
 
 | 11 | 77.40 | 2.222x | 4 independent FMA accumulators (ss0..ss3) — breaks dependency chain, enables ILP |
 
-**p36 best: v11 2.222x (77.40ms). Key: single-pass register-cached, 512 threads, launch_bounds(512,1), 4 independent accumulators.**
+| 12 | 77.10 | 2.231x | 8-way unroll — more outstanding loads per iteration, better latency hiding |
+
+**p36 best: v12 2.231x (77.10ms). Key: single-pass, 512 threads, launch_bounds(512,1), 4 accumulators, 8-way unroll.**
 
 ---
 

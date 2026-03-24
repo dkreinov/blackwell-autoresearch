@@ -284,9 +284,9 @@
   "36": {
     "name": "RMSNorm",
     "baseline_ms": 172.0,
-    "best_ms": 77.4,
-    "best_speedup": 2.222,
-    "iterations": 11,
+    "best_ms": 77.1,
+    "best_speedup": 2.231,
+    "iterations": 12,
     "history": [
       {
         "version": 1,
@@ -317,6 +317,12 @@
         "ms": 77.4,
         "speedup": 2.222,
         "note": "4 independent FMA accumulators (ss0..ss3) to break dependency chain and enable ILP"
+      },
+      {
+        "version": 12,
+        "ms": 77.1,
+        "speedup": 2.231,
+        "note": "8-way unroll (vs 4-way) \u2014 more outstanding loads, better latency hiding"
       }
     ]
   },
