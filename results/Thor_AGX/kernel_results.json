@@ -386,15 +386,21 @@
   "39": {
     "name": "L2Norm",
     "baseline_ms": 118.0,
-    "best_ms": 90.5,
-    "best_speedup": 1.304,
-    "iterations": 1,
+    "best_ms": 88.7,
+    "best_speedup": 1.33,
+    "iterations": 2,
     "history": [
       {
         "version": 1,
         "ms": 90.5,
         "speedup": 1.304,
         "note": "fused 2-pass, per-row sum(x^2) reduction, float4 aligned, rsqrtf, 1024 threads"
+      },
+      {
+        "version": 2,
+        "ms": 88.7,
+        "speedup": 1.33,
+        "note": "4x float4 per iteration in pass1 \u2014 better load pipelining"
       }
     ]
   },

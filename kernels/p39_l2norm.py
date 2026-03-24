@@ -6,8 +6,9 @@ cuda_source = """
 #include <torch/extension.h>
 #include <cuda_runtime.h>
 
-// Same pattern as p38 L1Norm but: sum(x^2) → rsqrtf → multiply.
-// One block per row, float4 with alignment handling.
+// v2: 4x float4 per thread per stride-loop iteration in pass 1.
+// body4 ≈ 16383, 1024 threads → 16 iters → 4 iters with 4x stride.
+// More outstanding loads for better latency hiding.
 __global__ __launch_bounds__(1024)
 void l2norm_kernel(const float* __restrict__ x, float* __restrict__ out, int dim) {
     int row = blockIdx.x;
@@ -26,22 +27,23 @@ void l2norm_kernel(const float* __restrict__ x, float* __restrict__ out, int dim
 
     const float4* body_ptr = reinterpret_cast<const float4*>(row_in + body_start);
 
-    // Pass 1: sum of squares
     float local_sum = 0.0f;
     for (int i = tid; i < head; i += blockDim.x) {
-        float v = row_in[i];
-        local_sum += v * v;
+        float v = row_in[i]; local_sum += v * v;
     }
-    for (int i = tid; i < body4; i += blockDim.x) {
-        float4 v = body_ptr[i];
-        local_sum += v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w;
+    // 4x unrolled float4 pass 1
+    for (int i = tid; i < body4; i += blockDim.x * 4) {
+        float4 a = body_ptr[i];
+        float4 b = (i + blockDim.x   < body4) ? body_ptr[i + blockDim.x  ] : make_float4(0,0,0,0);
+        float4 c = (i + blockDim.x*2 < body4) ? body_ptr[i + blockDim.x*2] : make_float4(0,0,0,0);
+        float4 d = (i + blockDim.x*3 < body4) ? body_ptr[i + blockDim.x*3] : make_float4(0,0,0,0);
+        local_sum += a.x*a.x+a.y*a.y+a.z*a.z+a.w*a.w + b.x*b.x+b.y*b.y+b.z*b.z+b.w*b.w
+                   + c.x*c.x+c.y*c.y+c.z*c.z+c.w*c.w + d.x*d.x+d.y*d.y+d.z*d.z+d.w*d.w;
     }
     for (int i = tail_start + tid; i < dim; i += blockDim.x) {
-        float v = row_in[i];
-        local_sum += v * v;
+        float v = row_in[i]; local_sum += v * v;
     }
 
-    // Warp reduction
     for (int offset = 16; offset > 0; offset >>= 1)
         local_sum += __shfl_down_sync(0xffffffff, local_sum, offset);
 
@@ -61,18 +63,13 @@ void l2norm_kernel(const float* __restrict__ x, float* __restrict__ out, int dim
     __syncthreads();
     float inv_norm = s_inv_norm;
 
-    // Pass 2: normalize
     for (int i = tid; i < head; i += blockDim.x)
         row_out[i] = row_in[i] * inv_norm;
 
     float4* out_body = reinterpret_cast<float4*>(row_out + body_start);
     for (int i = tid; i < body4; i += blockDim.x) {
         float4 v = body_ptr[i];
-        float4 r;
-        r.x = v.x * inv_norm;
-        r.y = v.y * inv_norm;
-        r.z = v.z * inv_norm;
-        r.w = v.w * inv_norm;
+        float4 r = {v.x*inv_norm, v.y*inv_norm, v.z*inv_norm, v.w*inv_norm};
         out_body[i] = r;
     }
     for (int i = tail_start + tid; i < dim; i += blockDim.x)
@@ -91,7 +88,7 @@ torch::Tensor l2norm_cuda(torch::Tensor x) {
 cpp_source = "torch::Tensor l2norm_cuda(torch::Tensor x);"
 
 l2norm_module = load_inline(
-    name='l2norm',
+    name='l2norm_v2',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
     functions=['l2norm_cuda'],
