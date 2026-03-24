@@ -473,9 +473,9 @@
   "91": {
     "name": "CumsumReverse",
     "baseline_ms": 110.0,
-    "best_ms": 63.8,
-    "best_speedup": 1.724,
-    "iterations": 2,
+    "best_ms": 57.6,
+    "best_speedup": 1.91,
+    "iterations": 3,
     "history": [
       {
         "version": 1,
@@ -488,6 +488,12 @@
         "ms": 63.8,
         "speedup": 1.724,
         "note": "tile-based coalesced: 32 tiles R\u2192L, warp-level rev-incl-scan + carry, no flip()"
+      },
+      {
+        "version": 3,
+        "ms": 57.6,
+        "speedup": 1.91,
+        "note": "float4 loads/stores, 256 threads, 8 tiles of 4096 elems, 16 elems/thread, 3 blocks/SM"
       }
     ]
   }

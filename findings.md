@@ -402,4 +402,6 @@ Tensor: (32768, 32768). Exclusive prefix sum along dim=1.
 | 1 | 110.0 | 1.000x | custom fwd-order kernel non-coalesced load, same as baseline |
 | 2 | 63.80 | 1.724x | tile-based coalesced: 32 tiles R-to-L, warp rev-incl-scan + carry, no flip |
 
-**p91 best: v2 1.724x (63.80ms). Key: coalesced tile loads, no flip overhead.**
+| 3 | 57.60 | 1.910x | float4 loads/stores, 256 threads, 8 tiles of 4096 elems, 16 elems/thread |
+
+**p91 best: v3 1.910x (57.60ms).**
