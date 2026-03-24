@@ -408,4 +408,15 @@ Tensor: (32768, 32768). Exclusive prefix sum along dim=1.
 
 | 5 | 38.10 | 2.887x | 1024 threads, 1 float4/thread, 4 local values, 1 block/SM but lowest reg pressure |
 
-**p91 best: v5 2.887x (38.10ms).**
+
+---
+
+## p93 MaskedCumsum (baseline 90.5ms)
+
+Tensor: (32768, 32768). Cumsum of x*mask along dim=1, mask is Bool.
+
+- FAIL v1: bool* cast to int* for mask loads -- strict aliasing violation, incorrect output
+- FAIL v2: uint8_t mask loads correct but eval harness converts Bool mask to Float32 before forward() -- data_ptr<bool>() fails with expected Bool but found Float
+- KEY INSIGHT: eval harness converts all inputs to Float32 on CUDA before passing to ModelNew. Must convert mask to uint8 in Python forward() before passing to C++ extension.
+
+| 3 | 74.10 | 1.221x | tile-based fwd cumsum, scalar uint8 mask loads, 1024 threads, 8 tiles of 4096 elems, Python converts mask.to(torch.uint8) before passing |

@@ -470,6 +470,21 @@
       }
     ]
   },
+  "93": {
+    "name": "MaskedCumsum",
+    "baseline_ms": 90.5,
+    "best_ms": 74.1,
+    "best_speedup": 1.221,
+    "iterations": 3,
+    "history": [
+      {
+        "version": 3,
+        "ms": 74.1,
+        "speedup": 1.221,
+        "note": "tile-based fwd cumsum fused w/ mask, scalar uint8 loads, 1024 threads, 8 tiles of 4096 elems"
+      }
+    ]
+  },
   "91": {
     "name": "CumsumReverse",
     "baseline_ms": 110.0,
