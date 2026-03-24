@@ -473,9 +473,9 @@
   "91": {
     "name": "CumsumReverse",
     "baseline_ms": 110.0,
-    "best_ms": 57.6,
-    "best_speedup": 1.91,
-    "iterations": 3,
+    "best_ms": 41.5,
+    "best_speedup": 2.651,
+    "iterations": 4,
     "history": [
       {
         "version": 1,
@@ -494,6 +494,12 @@
         "ms": 57.6,
         "speedup": 1.91,
         "note": "float4 loads/stores, 256 threads, 8 tiles of 4096 elems, 16 elems/thread, 3 blocks/SM"
+      },
+      {
+        "version": 4,
+        "ms": 41.5,
+        "speedup": 2.651,
+        "note": "512 threads, 2 float4s/thread per tile, 8 local values (less reg pressure), 3 blocks/SM"
       }
     ]
   }
