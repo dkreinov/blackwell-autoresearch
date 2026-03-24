@@ -273,6 +273,13 @@ Features strided by spatial_size (262144), but adjacent threads access adjacent 
 | 12 | 77.10 | 2.231x | 8-way unroll â€” more outstanding loads per iteration, better latency hiding |
 
 **p36 best: v12 2.231x (77.10ms). Key: single-pass, 512 threads, launch_bounds(512,1), 4 accumulators, 8-way unroll.**
+- FAIL v13: 16-way unroll 8 accumulators (78.70ms 2.186x) — too many live registers cause spills
+- FAIL v14: 4-threads-per-spatial, vals[16] (146ms 1.178x) — coalescing broken: non-adjacent warp threads per spatial
+- FAIL v15: 768 threads + launch_bounds(768,2) (174ms 0.989x) — 85 regs/thread cap forces spill for vals[64]
+- FAIL v16: float* row_ptr + int32 offset (77.50ms 2.219x) — compiler already optimizes int64, no gain
+- FAIL v17: #pragma unroll on 8-way loops (77.20ms 2.228x) — within noise, already unrolled by -O3
+- FAIL v18: no bounds check exact grid (79.90ms 2.153x) — removing branch changes code gen, slightly worse
+- FAIL v19: (reserved — p36 at bandwidth ceiling, 77.1ms = 71% of 54.9ms theoretical)
 
 ---
 
