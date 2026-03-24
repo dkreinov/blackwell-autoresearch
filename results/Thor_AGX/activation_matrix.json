@@ -1,0 +1,172 @@
+{
+  "optimizations": {
+    "float4": {
+      "timestamp": "2026-03-22 10:11:03",
+      "elapsed_s": 602.8,
+      "results": {
+        "19": {
+          "name": "ReLU",
+          "status": "ok",
+          "custom_ms": 65.0,
+          "speedup": 0.885
+        },
+        "20": {
+          "name": "LeakyReLU",
+          "status": "ok",
+          "custom_ms": 65.0,
+          "speedup": 0.871
+        },
+        "21": {
+          "name": "Sigmoid",
+          "status": "ok",
+          "custom_ms": 64.3,
+          "speedup": 0.88
+        },
+        "22": {
+          "name": "Tanh",
+          "status": "ok",
+          "custom_ms": 65.0,
+          "speedup": 0.874
+        },
+        "25": {
+          "name": "Swish",
+          "status": "ok",
+          "custom_ms": 64.3,
+          "speedup": 2.208
+        },
+        "26": {
+          "name": "GELU",
+          "status": "ok",
+          "custom_ms": 64.3,
+          "speedup": 0.883
+        },
+        "27": {
+          "name": "SELU",
+          "status": "ok",
+          "custom_ms": 64.3,
+          "speedup": 0.883
+        },
+        "28": {
+          "name": "HardSigmoid",
+          "status": "ok",
+          "custom_ms": 64.3,
+          "speedup": 0.882
+        },
+        "29": {
+          "name": "Softplus",
+          "status": "ok",
+          "custom_ms": 64.3,
+          "speedup": 0.879
+        },
+        "30": {
+          "name": "Softsign",
+          "status": "ok",
+          "custom_ms": 65.0,
+          "speedup": 3.031
+        },
+        "31": {
+          "name": "ELU",
+          "status": "error",
+          "custom_ms": null,
+          "speedup": null
+        },
+        "32": {
+          "name": "HardTanh",
+          "status": "ok",
+          "custom_ms": 65.0,
+          "speedup": 0.872
+        },
+        "88": {
+          "name": "MinGPTNewGelu",
+          "status": "ok",
+          "custom_ms": 2.33,
+          "speedup": 8.498
+        }
+      }
+    },
+    "float4_exact": {
+      "timestamp": "2026-03-22 10:32:50",
+      "elapsed_s": 829.2,
+      "results": {
+        "19": {
+          "name": "ReLU",
+          "status": "ok",
+          "custom_ms": 57.4,
+          "speedup": 1.002
+        },
+        "20": {
+          "name": "LeakyReLU",
+          "status": "ok",
+          "custom_ms": 57.5,
+          "speedup": 0.984
+        },
+        "21": {
+          "name": "Sigmoid",
+          "status": "ok",
+          "custom_ms": 57.4,
+          "speedup": 0.986
+        },
+        "22": {
+          "name": "Tanh",
+          "status": "ok",
+          "custom_ms": 57.3,
+          "speedup": 0.991
+        },
+        "25": {
+          "name": "Swish",
+          "status": "ok",
+          "custom_ms": 57.2,
+          "speedup": 2.483
+        },
+        "26": {
+          "name": "GELU",
+          "status": "ok",
+          "custom_ms": 57.2,
+          "speedup": 0.993
+        },
+        "27": {
+          "name": "SELU",
+          "status": "ok",
+          "custom_ms": 57.3,
+          "speedup": 0.991
+        },
+        "28": {
+          "name": "HardSigmoid",
+          "status": "ok",
+          "custom_ms": 57.4,
+          "speedup": 0.988
+        },
+        "29": {
+          "name": "Softplus",
+          "status": "ok",
+          "custom_ms": 57.3,
+          "speedup": 0.986
+        },
+        "30": {
+          "name": "Softsign",
+          "status": "ok",
+          "custom_ms": 57.4,
+          "speedup": 3.432
+        },
+        "31": {
+          "name": "ELU",
+          "status": "ok",
+          "custom_ms": 57.3,
+          "speedup": 0.986
+        },
+        "32": {
+          "name": "HardTanh",
+          "status": "ok",
+          "custom_ms": 57.2,
+          "speedup": 0.991
+        },
+        "88": {
+          "name": "MinGPTNewGelu",
+          "status": "ok",
+          "custom_ms": 2.28,
+          "speedup": 8.684
+        }
+      }
+    }
+  }
+}

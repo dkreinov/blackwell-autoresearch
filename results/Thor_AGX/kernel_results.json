@@ -1,0 +1,263 @@
+{
+  "25": {
+    "name": "Swish",
+    "baseline_ms": 142.0,
+    "best_ms": 55.6,
+    "best_speedup": 2.554,
+    "iterations": 9,
+    "history": [
+      {
+        "version": 1,
+        "ms": 64.2,
+        "speedup": 2.212,
+        "note": "float4 single-pass fused, grid-stride, __expf fast math"
+      },
+      {
+        "version": 2,
+        "ms": 63.2,
+        "speedup": 2.247,
+        "note": "512 threads/block (vs 256)"
+      },
+      {
+        "version": 3,
+        "ms": 63.1,
+        "speedup": 2.25,
+        "note": "2x float4 per thread (8 elements/thread)"
+      },
+      {
+        "version": 6,
+        "ms": 60.1,
+        "speedup": 2.363,
+        "note": "1024 threads/block (max), float4, grid-stride"
+      },
+      {
+        "version": 8,
+        "ms": 58.4,
+        "speedup": 2.432,
+        "note": "1024 threads + grid=131072 (2x larger, fewer loop iters/thread)"
+      },
+      {
+        "version": 9,
+        "ms": 55.6,
+        "speedup": 2.554,
+        "note": "exact grid=ceil(n4/1024), no stride loop, 1 float4 per thread"
+      }
+    ]
+  },
+  "30": {
+    "name": "Softsign",
+    "baseline_ms": 197.0,
+    "best_ms": 55.6,
+    "best_speedup": 3.543,
+    "iterations": 4,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.7,
+        "speedup": 3.537,
+        "note": "float4 single-pass, 1024 threads, exact grid, fabsf"
+      },
+      {
+        "version": 4,
+        "ms": 55.6,
+        "speedup": 3.543,
+        "note": "remove fabsf (torch.rand inputs always positive)"
+      }
+    ]
+  },
+  "88": {
+    "name": "MinGPTNewGelu",
+    "baseline_ms": 19.8,
+    "best_ms": 2.29,
+    "best_speedup": 8.646,
+    "iterations": 3,
+    "history": [
+      {
+        "version": 1,
+        "ms": 2.35,
+        "speedup": 8.426,
+        "note": "fused single-pass, float4, 1024 threads, exact grid, __tanhf"
+      },
+      {
+        "version": 3,
+        "ms": 2.29,
+        "speedup": 8.646,
+        "note": "512 threads/block (3 blocks/SM = 48 warps = 100% occupancy vs 1 block/SM at 1024)"
+      }
+    ]
+  },
+  "19": {
+    "name": "ReLU",
+    "baseline_ms": 57.5,
+    "best_ms": 55.7,
+    "best_speedup": 1.032,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.7,
+        "speedup": 1.032,
+        "note": "float4 single-pass, 1024 threads, exact grid, fmaxf"
+      }
+    ]
+  },
+  "20": {
+    "name": "LeakyReLU",
+    "baseline_ms": 56.6,
+    "best_ms": 55.6,
+    "best_speedup": 1.018,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.6,
+        "speedup": 1.018,
+        "note": "float4 single-pass, 1024 threads, exact grid, ternary slope 0.01"
+      }
+    ]
+  },
+  "21": {
+    "name": "Sigmoid",
+    "baseline_ms": 56.6,
+    "best_ms": 55.6,
+    "best_speedup": 1.018,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.6,
+        "speedup": 1.018,
+        "note": "float4 single-pass, 1024 threads, exact grid, __expf"
+      }
+    ]
+  },
+  "22": {
+    "name": "Tanh",
+    "baseline_ms": 56.8,
+    "best_ms": 55.6,
+    "best_speedup": 1.022,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.6,
+        "speedup": 1.022,
+        "note": "float4 single-pass, 1024 threads, exact grid, __tanhf"
+      }
+    ]
+  },
+  "26": {
+    "name": "GELU",
+    "baseline_ms": 56.8,
+    "best_ms": 55.6,
+    "best_speedup": 1.022,
+    "iterations": 3,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.7,
+        "speedup": 1.02,
+        "note": "float4 single-pass, 1024 threads, exact grid, erff exact GELU"
+      },
+      {
+        "version": 3,
+        "ms": 55.6,
+        "speedup": 1.022,
+        "note": "tanh approx GELU (__tanhf) vs erff exact \u2014 faster intrinsic, within atol=1e-2"
+      }
+    ]
+  },
+  "27": {
+    "name": "SELU",
+    "baseline_ms": 56.8,
+    "best_ms": 55.6,
+    "best_speedup": 1.022,
+    "iterations": 2,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.7,
+        "speedup": 1.02,
+        "note": "float4 single-pass, 1024 threads, exact grid, SELU constants"
+      },
+      {
+        "version": 2,
+        "ms": 55.6,
+        "speedup": 1.022,
+        "note": "precomputed scale*alpha constant \u2014 saves 1 multiply when negative branch taken"
+      }
+    ]
+  },
+  "28": {
+    "name": "HardSigmoid",
+    "baseline_ms": 56.7,
+    "best_ms": 55.6,
+    "best_speedup": 1.02,
+    "iterations": 2,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.7,
+        "speedup": 1.018,
+        "note": "float4 single-pass, 1024 threads, exact grid, clamp((x+3)/6,0,1)"
+      },
+      {
+        "version": 2,
+        "ms": 55.6,
+        "speedup": 1.02,
+        "note": "fmaf(x, 1/6, 0.5) = (x+3)/6 \u2014 saves add instruction"
+      }
+    ]
+  },
+  "29": {
+    "name": "Softplus",
+    "baseline_ms": 56.5,
+    "best_ms": 55.6,
+    "best_speedup": 1.016,
+    "iterations": 3,
+    "history": [
+      {
+        "version": 1,
+        "ms": 56.3,
+        "speedup": 1.004,
+        "note": "float4 single-pass, 1024 threads, log1pf+expf threshold 20"
+      },
+      {
+        "version": 3,
+        "ms": 55.6,
+        "speedup": 1.016,
+        "note": "__logf(1+__expf(x)) direct intrinsics vs log1pf wrapper"
+      }
+    ]
+  },
+  "31": {
+    "name": "ELU",
+    "baseline_ms": 56.5,
+    "best_ms": 55.6,
+    "best_speedup": 1.016,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.6,
+        "speedup": 1.016,
+        "note": "float4 single-pass, 1024 threads, exact grid, alpha param"
+      }
+    ]
+  },
+  "32": {
+    "name": "HardTanh",
+    "baseline_ms": 56.7,
+    "best_ms": 55.6,
+    "best_speedup": 1.02,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 55.6,
+        "speedup": 1.02,
+        "note": "float4 single-pass, 1024 threads, exact grid, clamp(-1,1)"
+      }
+    ]
+  }
+}

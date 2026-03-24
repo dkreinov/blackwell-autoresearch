@@ -5,199 +5,115 @@
 Optimize CUDA kernels from KernelBench Level 1 on NVIDIA Jetson AGX Thor (Blackwell sm_110).
 
 - **Primary metric**: speedup vs PyTorch baseline (higher = better)
-- **Secondary metric**: performance per watt (speedup / GPU power in watts)
-- **Evaluation**: compile with nvcc (sm_110), test correctness (5 trials), benchmark (100 trials, cuda_event)
+- **Evaluation**: compile with nvcc (sm_110), test correctness (3 trials), benchmark (20 trials, cuda_event)
+- **Current category**: ACTIVATIONS (13 problems: 19-22, 25-32, 88)
+- **Iteration**: per-kernel optimization via `eval_kernel.py` — one problem at a time, round-robin schedule
 - **One kernel per experiment**: each KernelBench problem has one PyTorch Model → write one optimized CUDA replacement (ModelNew)
-- **Target**: beat PyTorch eager execution on Thor's unified memory architecture
 
 ### Autonomy
-You are running an autonomous optimization loop. Do NOT pause to ask for confirmation. Run experiments continuously until externally interrupted. If you encounter a problem, fix it yourself or skip and move on.
+Run experiments continuously until externally interrupted. Do not pause for confirmation.
 
 ---
 
-## 2. Thor Hardware Reference
+## 2. Thor Hardware
 
 ### 2.1 GPU
 
 | Spec | Value | Source |
 |---|---|---|
 | GPU | NVIDIA Thor | nvidia-smi |
-| Architecture | Blackwell (Tegra variant) | nvidia-smi |
+| Architecture | Blackwell | nvidia-smi (Product Architecture) |
 | Compute Capability | 11.0 (sm_110) | torch.cuda.get_device_capability() |
-| SMs | 20 (128 CUDA cores each = 2,560 total) | torch + web specs |
-| Tensor Cores | 96 (5th gen) | Web specs |
+| SMs | 20 | torch.cuda.get_device_properties() |
+| CUDA Cores per SM | 128 (2,560 total) | Web specs |
+| Tensor Cores | 96 (5th gen, FP8 capable) | Web specs |
 | Warp Size | 32 | torch.cuda.get_device_properties() |
-| Max Threads per SM | 1,536 | torch.cuda.get_device_properties() |
+| Max Threads per Block | 1,024 | cudaDeviceGetAttribute |
+| Max Threads per SM | 1,536 (48 warps) | torch.cuda.get_device_properties() |
+| Max Blocks per SM | 24 | cudaDeviceGetAttribute |
+| Max Registers per Thread | 255 | CUDA Programming Guide |
 | Registers per SM | 65,536 | torch.cuda.get_device_properties() |
-| Shared Memory per Block | 48 KB default, 227 KB opt-in max | torch.cuda.get_device_properties() |
-| Shared Memory per SM | 228 KB | torch.cuda.get_device_properties() |
-| L2 Cache | 32 MB | torch.cuda.get_device_properties() |
-| GPU Clock | 1,575 MHz (MAXN), 1,386 MHz (120W mode) | Measured |
+| Registers per Block | 65,536 | cudaDeviceGetAttribute |
+| Shared Memory per Block | 48 KB default, 227 KB opt-in | torch (shared_memory_per_block, _optin) |
+| Shared Memory per SM | 228 KB | torch (shared_memory_per_multiprocessor) |
+| L2 Cache | 32 MB | torch (L2_cache_size) |
+| GPU Clock (MAXN) | 1,575 MHz | sysfs gpu-gpc-0/cur_freq |
+| GPU Clock (120W mode) | 1,386 MHz | Measured (power sweep) |
 | FP32 Performance | 8.064 TFLOPS | Web specs |
-| Addressing Mode | ATS (Address Translation Services) | nvidia-smi |
-| Integrated GPU | Yes (is_integrated=1) — SoC, not discrete | torch.cuda.get_device_properties() |
+| Addressing Mode | ATS | nvidia-smi -q |
+| Integrated GPU | Yes (SoC, no discrete VRAM) | torch (is_integrated=1) |
+| Cooperative Launch | Supported | cudaDeviceGetAttribute |
+| Thread Block Clusters | Supported | PTX ISA 9.0 (.blocksareclusters) |
+| PTX ISA | 9.0 | CUDA 13.0 |
 
 ### 2.2 Memory
 
 | Spec | Value | Source |
 |---|---|---|
-| Type | LPDDR5X (unified — shared between CPU and GPU) | Web specs |
-| Size | 128 GB (125,772 MB usable) | /proc/meminfo |
+| Type | LPDDR5X (unified CPU+GPU, shared DRAM) | Web specs |
+| Size | 128 GB (125,772 MB usable) | /proc/meminfo, torch |
 | Bus Width | 256-bit | Web specs |
-| Clock | 4,266 MHz | tegrastats EMC_FREQ |
+| EMC Clock | 4,266 MHz | sysfs bpmp/debug/clk/emc/rate (sudo) |
 | Theoretical Bandwidth | 273 GB/s | Web specs |
-| Measured Bandwidth | 229 GB/s (84% efficiency) | Our elementwise kernel test |
+| PyTorch Allocator | native (cudaMalloc) | torch.cuda.get_allocator_backend() |
 
-**Critical difference from H100:** H100 has HBM3 at 2,039 GB/s (discrete, separate from CPU). Thor has LPDDR5X at 229 GB/s (unified, shared with CPU). Thor's memory bandwidth is 8.9x lower than H100.
+### 2.3 GPU L2 Caching by Allocation Type (CUDA 13.0)
 
-### 2.3 Power
+| Allocation | GPU L2 Cached |
+|---|---|
+| cudaMalloc | Yes |
+| Pageable host (malloc) | Yes |
+| cudaHostAlloc (pinned) | No |
+| cudaMallocManaged | No |
+| cudaHostRegister | Yes |
+
+[Source: CUDA for Tegra App Note, Section 3.2]
+
+### 2.4 Coherency
+
+- Two-way full coherency (Sysmem Full Coherency): CPU reads GPU cache, GPU reads GPU cache.
+- Hardware-managed via SoC interconnect.
+
+[Source: CUDA for Tegra App Note, CUDA 13.0 Blog]
+
+### 2.5 Power
 
 | Spec | Value | Source |
 |---|---|---|
 | Power Modes | MAXN (0), 120W (1), 90W (2), 70W (3) | nvpmodel.conf |
-| GPU Power (MAXN, benchmark load) | 22.1W avg, 38.4W peak | Our power sweep |
-| GPU Power (120W, benchmark load) | 20.8W avg, 36.3W peak | Our power sweep |
-| GPU Temp (MAXN, benchmark load) | 50.6°C avg, 66.6°C peak | Our power sweep |
-| Sensors | VDD_GPU, VDD_CPU_SOC_MSS, VIN_SYS_5V0 | tegrastats |
-| tegrastats format | SENSOR inst_mW/avg_mW | Measured |
+| GPU Power (MAXN, Level 1 benchmark) | 22.1W avg, 38.4W peak | Our power sweep |
+| GPU Power (120W, Level 1 benchmark) | 20.8W avg, 36.3W peak | Our power sweep |
+| GPU Temp (MAXN, Level 1 benchmark) | 50.6°C avg, 66.6°C peak | Our power sweep |
 
-### 2.4 Comparison with H100 PCIe
+### 2.6 Software
 
-| Spec | Thor | H100 PCIe | Ratio |
-|---|---|---|---|
-| SMs | 20 | 114 | 0.18x |
-| CUDA Cores | 2,560 | 14,592 | 0.18x |
-| Memory Bandwidth | 229 GB/s | 2,039 GB/s | 0.11x |
-| L2 Cache | 32 MB | 50 MB | 0.64x |
-| FP32 TFLOPS | 8.064 | 51.2 | 0.16x |
-| Memory | LPDDR5X unified | HBM3 discrete | Different |
-| Baseline Median (Level 1) | 51.5 ms | 6.95 ms | 7.6x slower |
+| Component | Version | Source |
+|---|---|---|
+| Driver | 580.00 | nvidia-smi |
+| CUDA | 13.0 | nvidia-smi |
+| nvcc | 13.0.48 | nvcc --version |
+| torch | 2.9.1+cu130 | Python |
+| Python | 3.12.3 | system |
+| OS | Ubuntu 24.04.3 LTS (aarch64, tegra) | system |
 
 ---
 
-## 3. Unified Memory on Thor (ATS)
+## 3. Compilation
 
-This section describes how Thor's memory differs from discrete GPUs. The LLM's CUDA training data is mostly from H100/A100 with HBM. Thor's unified memory changes which optimizations are effective.
-
-### 3.1 Architecture
-
-- CPU and iGPU share all SoC DRAM (LPDDR5X). There is no dedicated VRAM.
-- Device memory, host memory, and unified memory are all on the same physical DRAM.
-- There is no PCIe bus between CPU and GPU — no transfer latency, no cudaMemcpy overhead for data movement.
-- cudaMemcpy between device pointers on Thor does not perform a DMA copy across a bus. It is still useful because it populates the GPU L2 cache.
-
-[Source: CUDA for Tegra App Note]
-
-### 3.2 Coherency
-
-- Thor has "Sysmem Full Coherency" (two-way): CPU reads GPU cache, GPU reads CPU cache.
-- Hardware-managed via SoC interconnect — no manual cache flush/invalidate needed.
-- Full coherency is Thor-specific. Xavier and Orin only have one-way I/O coherency.
-
-[Source: CUDA for Tegra App Note, CUDA 13.0 Blog]
-
-### 3.3 Memory Caching by Type (Thor, CUDA 13.0)
-
-| Memory Type | CPU Cache | GPU L2 Cache | Notes |
-|---|---|---|---|
-| cudaMalloc (device) | Not accessible | Cached | Best for GPU-only data |
-| Pageable host (malloc) | Cached | Cached | Directly accessible from GPU kernels |
-| Pinned host (cudaHostAlloc) | Cached | NOT cached | GPU uncached on Thor |
-| Registered host (cudaHostRegister) | Cached | Cached | Best for shared CPU/GPU data |
-| cudaMallocManaged | Cached | NOT cached | UVM driver uses IO coherency only in 13.0 |
-
-[Source: CUDA for Tegra App Note, Section 3.2]
-
-### 3.4 Critical Limitation
-
-**cudaMallocManaged() allocations are NOT cached in GPU L2 in CUDA 13.0 on Thor.** Code using cudaMallocManaged will have worse GPU performance than code using cudaMalloc. The UVM driver currently selects IO coherency only for managed allocations.
-
-[Source: CUDA 13.0 Blog]
-
-### 3.5 Allocation Strategy (Thor, CUDA 13.0)
-
-| Use Case | Recommended Allocation |
-|---|---|
-| GPU-only data | cudaMalloc — GPU L2 cached |
-| Shared CPU/GPU data | cudaHostRegister on malloc'd memory — cached on both |
-| Large buffers, GPU-heavy access | cudaMalloc — best GPU performance |
-| Small transfer buffers | cudaHostAlloc (pinned) — CPU cached, GPU uncached |
-| Do NOT use for GPU performance | cudaMallocManaged — NOT GPU-cached in 13.0 |
-
-[Source: CUDA for Tegra App Note, Section 4]
-
-### 3.6 Implications for Kernel Optimization
-
-Because CPU and GPU share DRAM:
-- Shared memory tiling to reduce global memory accesses has a DIFFERENT cost/benefit profile than on H100
-- On H100: global memory = HBM (high bandwidth but still bottleneck) → shared memory tiling helps
-- On Thor: global memory = LPDDR5X (lower bandwidth, but no PCIe penalty) → tiling benefit depends on L2 cache utilization
-- The L2 cache (32 MB) can hold significant working sets — kernels that fit in L2 may not benefit from shared memory tiling
-- Reduction operations optimized for HBM access patterns consistently hurt on Thor (see Section 4)
+- Target: `TORCH_CUDA_ARCH_LIST=11.0` (NOT "Blackwell" — that maps to sm_100/120, not sm_110)
+- Flags: `-O3 --use_fast_math`
+- Build: `torch.utils.cpp_extension.load_inline()`
+- Correctness tolerance: atol=1e-2, rtol=1e-2
 
 ---
 
-## 4. Transfer Study: Measured Results
+## 4. Baseline Data
 
-We evaluated 63 CUDA kernels from Sakana AI's archive (optimized for H100) on Thor. These are empirical facts, not predictions.
+[Source: baseline_level1.json, MAXN mode, 100 trials, cuda_event timing]
 
-[Source: Our evaluation using eval_sakana_kernels.py on Thor sm_110]
+99/100 problems pass. Problem 95 (CrossEntropyLoss) fails on sm_110.
 
-### 4.1 Overall Transfer Results
-
-| Metric | Value |
-|---|---|
-| Tasks evaluated | 63 |
-| Compiled + correct on Thor | 32 (51%) |
-| Compile failures (sm_110 incompatibility) | 26 (41%) |
-| Incorrect output | 5 (8%) |
-| Of 32 correct: faster than PyTorch on Thor | 23 (72%) |
-| Of 32 correct: slower than PyTorch on Thor | 9 (28%) |
-| Thor speedup median | 1.195x |
-| Thor speedup range | 0.349x to 39.953x |
-
-### 4.2 What Transfers Well
-
-| Category | n | Success Rate | Median Thor Speedup | Transfer Ratio |
-|---|---|---|---|---|
-| normalization | 4 | 4/4 (100%) | 2.349x | 0.944 |
-| activation | 10 | 9/10 (90%) | 1.228x | 1.047 |
-| softmax | 2 | 2/2 (100%) | 1.127x | 1.054 |
-| loss | 5 | 4/5 (80%) | 1.864x | 0.700 |
-| conv | 1 | 1/1 (100%) | 1.440x | 1.162 |
-
-Normalization kernels transfer best. Activation speedups are nearly identical on Thor and H100 (ratio ~1.05).
-
-### 4.3 What Backfires
-
-| Category | n | Success Rate | Median Thor Speedup | Transfer Ratio |
-|---|---|---|---|---|
-| reduction | 9 | 2/9 (22%) | 0.750x | 0.350 |
-
-7 out of 9 reduction kernels are SLOWER on Thor than PyTorch baseline. The H100-optimized shared memory tiling and warp-level reduction patterns hurt on Thor's unified LPDDR5X memory.
-
-Specific backfire cases:
-- Sum reduction: H100 1.47x → Thor 0.38x
-- Max reduction: H100 1.50x → Thor 0.40x
-- Argmin: H100 1.73x → Thor 0.62x
-- cumsum: H100 2.21x → Thor 0.75x
-
-### 4.4 Standout Successes
-
-| Task | Op | H100 | Thor | Notes |
-|---|---|---|---|---|
-| 12 | Diagonal Matmul | 54.4x | 39.95x | Specialized algorithm wins on both |
-| 88 | MinGPTNewGelu | 5.72x | 6.00x | Fused activation — MORE effective on Thor |
-| 97 | CosineSimilarityLoss | 7.64x | 5.35x | Custom reduction + normalize |
-| 40 | LayerNorm | 8.60x | 2.57x | Fused norm — transfers but less effective |
-
----
-
-## 5. Baseline Performance Data
-
-[Source: Our baseline_level1.json (MAXN mode, 100 trials, cuda_event timing)]
-
-### 5.1 Thor Baseline by Category (PyTorch eager, FP32)
+### By Category (PyTorch eager, FP32)
 
 | Category | n | Median (ms) | Min (ms) | Max (ms) |
 |---|---|---|---|---|
@@ -211,136 +127,91 @@ Specific backfire cases:
 | loss | 5 | 69.10 | 47.40 | 122.00 |
 | attention | 1 | 143.00 | 143.00 | 143.00 |
 
-99/100 problems pass. Problem 95 (CrossEntropyLoss) fails: nll_loss kernel not compiled for sm_110.
+---
 
-### 5.2 Bandwidth-Bound Indicator
+## 5. Activation Loop Protocol
 
-Activations (elementwise) on Thor: median 56.7ms for 16M float32 elements = ~4.5 GB/s effective.
-Peak measured bandwidth: 229 GB/s. The gap indicates these kernels are not bandwidth-saturating — room for optimization via memory coalescing, vectorized loads, and launch configuration.
+### Category: Activations (13 problems)
+
+All 13 are elementwise `x -> f(x)` ops on a 4096×393216 float32 tensor (except pid 88: 8192×8192).
+Each problem has its own independently-evolving kernel file.
+
+Current best speedups are tracked in `results/Thor_AGX/kernel_results.json` (source of truth).
+
+| PID | Name | Baseline (ms) | Kernel File |
+|-----|------|---------------|-------------|
+| 19 | ReLU | 57.5 | kernels/p19_relu.py |
+| 20 | LeakyReLU | 56.6 | kernels/p20_leakyrelu.py |
+| 21 | Sigmoid | 56.6 | kernels/p21_sigmoid.py |
+| 22 | Tanh | 56.8 | kernels/p22_tanh_act.py |
+| 25 | Swish | 142.0 | kernels/p25_swish.py |
+| 26 | GELU | 56.8 | kernels/p26_gelu.py |
+| 27 | SELU | 56.8 | kernels/p27_selu.py |
+| 28 | HardSigmoid | 56.7 | kernels/p28_hardsigmoid.py |
+| 29 | Softplus | 56.5 | kernels/p29_softplus.py |
+| 30 | Softsign | 197.0 | kernels/p30_softsign.py |
+| 31 | ELU | 56.5 | kernels/p31_elu.py |
+| 32 | HardTanh | 56.7 | kernels/p32_hardtanh.py |
+| 88 | MinGPTNewGelu | 19.8 | kernels/p88_mingptnewgelu.py |
+
+[Source: baseline_level1.json, MAXN mode, 100 trials, cuda_event timing]
+
+### Files
+
+- `kernels/p{pid}_{name}.py` — current best kernel (evolves in place, git tracks history)
+- `scripts/eval_kernel.py` — single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{N}_*.py`
+- `results/Thor_AGX/kernel_results.json` — per-problem best speedup + version history
+- `findings.md` — per-problem experiment results and failures
+- `schedule.json` — round-robin order and timing config
+
+### Loop (run autonomously, do not pause)
+
+**Schedule**: `schedule.json` defines the order and timing. Spend 1 hour per activation in round-robin.
+Max 2 minutes per experiment (eval times out at 120s).
+
+**Per-experiment cycle** (repeat until 1hr on current activation, then advance schedule):
+
+1. Read `findings.md` section for current problem — what has been tried, what failed
+2. Read `results/Thor_AGX/kernel_results.json` — current best speedup for this problem
+3. Read current kernel file `kernels/p{pid}_{name}.py` — the code to improve
+4. Invent ONE targeted change based on:
+   - Thor hardware specs (Section 2)
+   - What failed before (findings.md for this problem)
+   - Ideas that haven't been tried yet
+5. Write the modified kernel to `kernels/p{pid}_{name}_candidate.py`
+6. Run: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{pid}_{name}_candidate.py`
+   - Must complete in <120s or it's discarded
+7. **If result is correct AND faster than current best**:
+   - Overwrite `kernels/p{pid}_{name}.py` with the candidate
+   - Update `results/Thor_AGX/kernel_results.json` (best_speedup, best_ms, iterations, history)
+   - Update `findings.md` section: add row to table, note what worked
+   - Commit on Thor: `git add kernels/p{pid}_{name}.py results/Thor_AGX/kernel_results.json findings.md`
+     `git commit -m "p{pid}: {name} v{N} — <change>, {old}x -> {new}x"`
+   - Delete the candidate file
+8. **If result is slower, incorrect, or times out**:
+   - Discard candidate, do NOT overwrite current best
+   - Note the failure in findings.md (one line: what was tried and why it failed)
+   - Delete the candidate file
+9. Go to step 1 for the same problem (until 1hr elapsed, then advance schedule)
+
+### Schedule Enforcement
+
+- Track start time when switching to a new activation
+- After 3600s on current activation: advance to next in `schedule.json` order
+- After all 13: round-robin back to first
+- Only the user decides when to stop the loop entirely
+
+### Commit Format
+
+```
+p{pid}: {name} v{N} — {one-line change description}, {old_speedup}x -> {new_speedup}x
+```
+
+Only commit improvements. Discards are noted in findings.md but not committed.
 
 ---
 
-## 6. KernelBench Problem Format
-
-### 6.1 Problem Structure
-
-Each KernelBench Level 1 problem is a Python file containing:
-
-```python
-class Model(nn.Module):
-    def __init__(self):       # Store parameters (weights, bias, etc.)
-        ...
-    def forward(self, *args): # The operation to optimize
-        return torch.some_op(...)
-
-def get_inputs():             # Returns list of input tensors
-    return [torch.randn(...)]
-
-def get_init_inputs():        # Returns list of Model constructor args
-    return []
-```
-
-### 6.2 Expected Output
-
-A Python file containing `ModelNew(Model)` that:
-1. Compiles custom CUDA code via `torch.utils.cpp_extension.load_inline()` or `load()`
-2. Calls the compiled CUDA `forward()` function in `ModelNew.forward()`
-3. Produces output identical to `Model.forward()` (within atol=1e-2, rtol=1e-2)
-
-### 6.3 CUDA Code Pattern
-
-The CUDA code exports a `forward()` function via PYBIND11:
-
-```cpp
-#include <torch/extension.h>
-#include <cuda_runtime.h>
-
-__global__ void my_kernel(...) { ... }
-
-torch::Tensor forward(torch::Tensor input, ...) {
-    // Launch kernel, return result
-}
-
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("forward", &forward, "description");
-}
-```
-
-### 6.4 Compilation
-
-- Compiler: nvcc 13.0.48
-- Required: `TORCH_CUDA_ARCH_LIST=11.0` (NOT "Blackwell" — that maps to sm_100/103/120/121, not sm_110)
-- Flags: `-O3 --use_fast_math` recommended
-- Build: `torch.utils.cpp_extension.load(name=..., sources=[...], extra_cuda_cflags=["-O3", "--use_fast_math"])`
-
----
-
-## 7. Loop Protocol
-
-All commands run via SSH to Thor using `thor_agent.sh`:
-
-```bash
-SSH="ssh -o StrictHostKeyChecking=no nvidia@nvidia-thor-01"
-AGENT="bash ~/thor_kernelbench_work/thor_agent.sh"
-```
-
-### Before Each Experiment
-1. Read `findings.md` — current best, what's been tried, active ideas, dead ends
-2. Read the problem: `$SSH "$AGENT read-problem <id>"`
-3. Read the baseline: `$SSH "$AGENT baseline <id>"`
-4. Pick ONE optimization idea (from findings.md or invent one based on hardware knowledge)
-
-### Execute
-5. Write the CUDA kernel locally as a Python file with `ModelNew` class
-6. SCP to Thor: `scp <file> nvidia@nvidia-thor-01:~/thor_kernelbench_work/kernels/<name>.py`
-7. Evaluate: `$SSH "$AGENT eval-kernel kernels/<name>.py <id>"`
-   - This compiles (sm_110), tests correctness (5 trials), benchmarks (100 trials)
-   - Output: `[OK] Custom: X.XXms Speedup: X.XXx` or `[COMPILE_ERROR]` or `[INCORRECT]`
-8. Read power: `$SSH "$AGENT power"`
-
-### Decide
-9. **[OK] with speedup > best**: keep, record in findings.md, iterate to improve
-10. **[OK] but no improvement**: stop iterating on this problem, move to next
-11. **[COMPILE_ERROR]**: read the error, fix if simple (typo/syntax), discard if fundamental
-12. **[INCORRECT]**: discard immediately — math was wrong
-13. **[ERROR] or timeout**: discard, move on
-
-### Discipline
-- ONE change per experiment
-- Read compile errors carefully — they contain sm_110-specific information
-- If ideas run out: simplify the kernel, remove unnecessary shared memory, try vectorized loads
-
----
-
-## 8. Power Monitoring
-
-### Reading Power
-
-```bash
-ssh nvidia@nvidia-thor-01 "bash ~/thor_kernelbench_work/thor_agent.sh power"
-# Returns: VDD_GPU readings + gpu/cpu temperature
-```
-
-### tegrastats Line Format
-
-```
-03-19-2026 07:10:07 RAM 44721/125772MB ... VDD_GPU 3960mW/3960mW VDD_CPU_SOC_MSS 7520mW/7520mW VIN 28796mW/28796mW
-```
-
-Each power sensor shows: `<instantaneous>mW/<running_average>mW`
-
-### Performance per Watt
-
-```
-perf_per_watt = speedup_vs_baseline / gpu_power_watts
-```
-
-A kernel that achieves 2x speedup at 25W GPU power has perf_per_watt = 0.08.
-A kernel that achieves 1.5x speedup at 15W GPU power has perf_per_watt = 0.10 (better).
-
----
-
-## 9. Rules
+## 6. Rules
 
 ### Allowed
 - Write custom CUDA kernels using any standard CUDA features
@@ -354,33 +225,27 @@ A kernel that achieves 1.5x speedup at 15W GPU power has perf_per_watt = 0.10 (b
 - Use cuBLAS/cuDNN library calls that just wrap the same PyTorch operation
 - Change the test/evaluation infrastructure
 - Use features that require sm_120+ (Thor is sm_110)
+- Overwrite a kernel file unless the new version is strictly better (correct + faster)
 
 ### Anti-Paralysis Rules
 1. First tool call within first response — no multi-paragraph analysis before acting
 2. No cycle estimation in prose — the benchmark is the oracle
 3. One response = one action — every response must contain a tool call
-4. If resuming from context summary: read current state, pick next experiment, execute immediately
+4. If resuming from context summary: read kernel_results.json + schedule.json, pick current problem, execute immediately
 
 ---
 
-## 10. Output Format
+## 7. Output Format
 
-After each experiment:
+After each experiment (one problem, one change):
 
 ```
-=== EXPERIMENT N ===
-Problem: <task_id> <name>
-Idea: <one-line description>
-Change: <what the kernel does differently, 1-2 lines>
-Compile: success | error: <message>
-Correct: yes | no (max_diff=X)
-Baseline: <X.XX>ms
-Custom: <X.XX>ms
-Speedup: <X.XX>x
-Power: <X.X>W GPU avg
-Perf/Watt: <X.XXX>
-Status: keep | discard | crash
-findings.md updated: yes | no
-Next: <what to try next>
+=== p{pid} {name} — attempt {N} ===
+Idea: <one-line description of the change>
+Result: OK {ms}ms {speedup}x | FAIL {reason}
+vs current best: {old_speedup}x -> {new_speedup}x (+{pct}%) | no improvement
+Action: committed v{N} | discarded
+findings.md: updated | noted failure
+Next: <what to try next for this problem>
 ===
 ```

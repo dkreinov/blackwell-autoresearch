@@ -1,0 +1,12 @@
+{
+  "order": [25, 30, 88, 19, 20, 21, 22, 26, 27, 28, 29, 31, 32],
+  "names": {
+    "19": "ReLU", "20": "LeakyReLU", "21": "Sigmoid", "22": "Tanh",
+    "25": "Swish", "26": "GELU", "27": "SELU", "28": "HardSigmoid",
+    "29": "Softplus", "30": "Softsign", "31": "ELU", "32": "HardTanh",
+    "88": "MinGPTNewGelu"
+  },
+  "time_per_activation_s": 3600,
+  "max_experiment_s": 120,
+  "notes": "Priority: Swish/Softsign/MinGPTNewGelu first (multi-pass PyTorch, most room). Then 57ms group."
+}

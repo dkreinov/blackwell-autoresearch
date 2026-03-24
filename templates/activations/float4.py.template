@@ -1,0 +1,66 @@
+import torch
+import torch.nn as nn
+from torch.utils.cpp_extension import load_inline
+
+cuda_source = """
+#include <torch/extension.h>
+#include <cuda_runtime.h>
+#include <math.h>
+
+__device__ __forceinline__ float activation(float val) {
+    return {ACTIVATION_FUNC};
+}
+
+__global__ void kernel(const float* __restrict__ input,
+                       float* __restrict__ output,
+                       const int n) {
+    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const int stride = blockDim.x * gridDim.x;
+    const int n4 = n / 4;
+
+    const float4* input4 = reinterpret_cast<const float4*>(input);
+    float4* output4 = reinterpret_cast<float4*>(output);
+
+    for (int i = tid; i < n4; i += stride) {
+        float4 in = input4[i];
+        float4 out;
+        out.x = activation(in.x);
+        out.y = activation(in.y);
+        out.z = activation(in.z);
+        out.w = activation(in.w);
+        output4[i] = out;
+    }
+
+    for (int i = n4 * 4 + tid; i < n; i += stride) {
+        output[i] = activation(input[i]);
+    }
+}
+
+torch::Tensor forward(torch::Tensor x) {
+    auto output = torch::empty_like(x);
+    const int n = x.numel();
+    const int threads = 256;
+    const int blocks = min((n / 4 + threads - 1) / threads, 65535);
+    kernel<<<blocks, threads>>>(x.data_ptr<float>(), output.data_ptr<float>(), n);
+    return output;
+}
+"""
+
+cpp_source = "torch::Tensor forward(torch::Tensor x);"
+
+module = load_inline(
+    name="{ACTIVATION_NAME}_cuda",
+    cpp_sources=cpp_source,
+    cuda_sources=cuda_source,
+    functions=["forward"],
+    extra_cuda_cflags=["-O3", "--use_fast_math"],
+    verbose=False,
+)
+
+
+class ModelNew(nn.Module):
+    def __init__(self):
+        super(ModelNew, self).__init__()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return module.forward(x)
