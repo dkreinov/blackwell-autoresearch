@@ -349,8 +349,12 @@ Tensor: (112, 64, 512, 512) = 1.88B elements. Global norm then divide.
 |---|-----|---------|--------|
 | 1 | 96.30 | 1.023x | multi-block atomicAdd + elementwise normalize, float4 |
 
-**p37 best: v1 1.023x (96.30ms). Minimal gain â€” PyTorch already efficient for global reduction.**
+- FAIL v2: 2048-block grid-stride both phases (109ms 0.904x) — grid-stride loop overhead kills bandwidth
+- FAIL v3: 1024-block grid-stride phase2 only (110ms 0.895x) — same issue
+- FAIL v4: 4x float4/iter phase1 (97.70ms 1.008x) — conditional loads slow
 
+**p37 best: v1 1.023x (96.30ms). Minimal gain â€” PyTorch already efficient for global reduction.**
+**p37 best: v1 1.023x (96.30ms). Phase2 with 459K tiny blocks is optimal — no loop overhead per thread.**
 ---
 
 ## p94 MSELoss (baseline 103.0ms)
