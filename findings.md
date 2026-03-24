@@ -406,4 +406,6 @@ Tensor: (32768, 32768). Exclusive prefix sum along dim=1.
 
 | 4 | 41.50 | 2.651x | 512 threads, 2 float4s/thread, 8 local vals (lower reg pressure) |
 
-**p91 best: v4 2.651x (41.50ms).**
+| 5 | 38.10 | 2.887x | 1024 threads, 1 float4/thread, 4 local values, 1 block/SM but lowest reg pressure |
+
+**p91 best: v5 2.887x (38.10ms).**
