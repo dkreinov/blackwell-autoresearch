@@ -263,9 +263,9 @@
   "38": {
     "name": "L1Norm",
     "baseline_ms": 193.0,
-    "best_ms": 90.6,
-    "best_speedup": 2.13,
-    "iterations": 2,
+    "best_ms": 90.0,
+    "best_speedup": 2.144,
+    "iterations": 3,
     "history": [
       {
         "version": 1,
@@ -278,6 +278,12 @@
         "ms": 90.6,
         "speedup": 2.13,
         "note": "float4 vectorized loads with per-row alignment handling"
+      },
+      {
+        "version": 3,
+        "ms": 90.0,
+        "speedup": 2.144,
+        "note": "4x float4 per iteration in pass1 body loop \u2014 better load pipelining"
       }
     ]
   },
