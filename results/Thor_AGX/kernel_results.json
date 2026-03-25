@@ -422,36 +422,54 @@
   "23": {
     "name": "Softmax",
     "baseline_ms": 100.0,
-    "best_ms": 92.1,
-    "best_speedup": 1.086,
-    "iterations": 5,
+    "best_ms": 92.6,
+    "best_speedup": 1.08,
+    "iterations": 4,
     "history": [
       {
-        "version": 2,
-        "ms": 92.2,
-        "speedup": 1.085,
-        "note": "online softmax (Milakov-Gimelshein) fusing max+sum in 1 pass, float4, 1024 threads"
+        "version": 1,
+        "ms": 92.6,
+        "speedup": 1.08,
+        "note": "online softmax, float4 8x unroll, 1024t — SFU-bound on expf"
       },
       {
-        "version": 5,
-        "ms": 92.1,
-        "speedup": 1.086,
-        "note": "batched float4 online update \u05d2\u20ac\u201d 1 max update per float4 instead of 4"
+        "version": 2,
+        "ms": 115.0,
+        "speedup": 0.87,
+        "note": "3-pass separate max — extra pass overhead dominates, WORSE"
+      },
+      {
+        "version": 3,
+        "ms": 92.9,
+        "speedup": 1.076,
+        "note": "512 threads (2 blocks/SM) — no improvement, SFU-bound"
+      },
+      {
+        "version": 4,
+        "ms": 93.3,
+        "speedup": 1.072,
+        "note": "256 threads (4 blocks/SM) — no improvement, SFU-bound"
       }
     ]
   },
   "24": {
     "name": "LogSoftmax",
     "baseline_ms": 110.0,
-    "best_ms": 92.3,
-    "best_speedup": 1.192,
-    "iterations": 1,
+    "best_ms": 92.1,
+    "best_speedup": 1.194,
+    "iterations": 2,
     "history": [
       {
         "version": 1,
-        "ms": 92.3,
-        "speedup": 1.192,
-        "note": "online softmax + cheap normalize (x - max - log(sum)), no __expf in pass 2"
+        "ms": 92.1,
+        "speedup": 1.194,
+        "note": "online softmax + trivial normalize (x - offset, no expf in pass 2) — BEST"
+      },
+      {
+        "version": 2,
+        "ms": 115.0,
+        "speedup": 0.957,
+        "note": "3-pass separate max — extra pass overhead dominates, WORSE"
       }
     ]
   },

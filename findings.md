@@ -555,3 +555,54 @@ HW=262144 IS divisible by 4 → all slices are 16-byte aligned → float4 works.
 Practical floor ~98ms; theoretical 55ms. Gap: larger slice (1 MB) causes more L2 pressure than p38 (256 KB).
 
 **p34 DONE. 1.376x. L2-reuse fused float4 kernel is the floor.**
+
+---
+## p23 — Softmax (baseline 100ms)
+
+Input: (4096, 393216) float32. Operation: row-wise softmax over dim=1.
+Row size: 393216 × 4 = 1.5 MB. All rows 16B aligned → float4 works.
+Floor (1 DRAM read + 1 DRAM write): 12.88 GB / 273 GB/s = 47ms → 2.13x theoretical.
+
+**Key constraint: SFU-bound on expf.**
+Softmax requires exp(x_i - max) for every element in BOTH pass 1 (online max+sum) and pass 2 (normalize). The SFU throughput for expf is the binding constraint — not memory bandwidth.
+
+**v1 (online softmax, fused 2-pass, float4 8x unroll, 1024t): 92.60ms (1.080x) ← BEST**
+- Pass 1 (DRAM): online max+sum, 32 expf per 32 elements. Compute-bound.
+- Pass 2 (L2): exp(x-gmax)*inv_sum, 1 expf per element. Also compute-bound.
+- Warp-level online combine in reduction: expf for adjust and scale.
+
+**v2 (3-pass: max-only, sum-exp, normalize; 1024t): 115ms** — WORSE
+- Decoupled max pass was supposed to run at full BW, but extra pass cost dominates.
+- Even though passes 2+3 read from L2, 3 loops × 393216 elements > 2 loops.
+
+**v3 (online softmax, 512t): 92.90ms** — same as v1 (2 blocks/SM doesn't help)
+**v4 (online softmax, 256t): 93.30ms** — same as v1 (4 blocks/SM doesn't help)
+
+All thread counts converge to ~92-93ms: SFU throughput is the fixed ceiling.
+No improvement from different thread counts, separate max pass, or extra passes.
+PyTorch baseline at 100ms also limited by the same expf SFU ceiling.
+
+**p23 DONE. 1.080x. SFU-bound on expf — ceiling established across 4 variants.**
+
+---
+## p24 — LogSoftmax (baseline 110ms)
+
+Input: (4096, 393216) float32. Operation: row-wise log_softmax over dim=1.
+LogSoftmax: `y_i = x_i - max - log(Σexp(x_j - max))` = `x_i - offset`, where offset is a scalar per row.
+
+**Key insight: pass 2 becomes trivial.**
+Unlike Softmax (where pass 2 computes expf for each element), LogSoftmax pass 2 is just `y_i = x_i - offset` — a subtraction. No expf in pass 2.
+
+**v1 (online max+sum pass1, trivial pass2, float4 8x unroll, 1024t): 92.10ms (1.194x) ← BEST**
+- Pass 1 (DRAM): online max+sum, same as Softmax v1. SFU-bound.
+- Pass 2 (L2): y_i = x_i - offset. Pure arithmetic, near-free.
+- Kernel time dominated by pass 1 → 92ms = same wall time as Softmax v1 (92.6ms).
+- Higher speedup vs baseline because PyTorch LogSoftmax baseline is 110ms (vs 100ms Softmax).
+
+**v2 (3-pass: max-only, sum-exp from L2, trivial normalize): 115ms (0.957x)** — WORSE
+- Same pattern as Softmax: extra pass overhead outweighs pass-1 savings.
+
+Baseline PyTorch LogSoftmax (110ms) is slower than Softmax (100ms) because it uses log(softmax) which does log() per element or equivalent. Our kernel eliminates per-element log() entirely.
+
+**p24 DONE. 1.194x. Online max+sum + trivial pass-2 subtract is the ceiling.**
+
