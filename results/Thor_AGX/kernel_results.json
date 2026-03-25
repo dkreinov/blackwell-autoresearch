@@ -428,15 +428,51 @@
   "94": {
     "name": "MSELoss",
     "baseline_ms": 103.0,
-    "best_ms": 37.8,
-    "best_speedup": 2.725,
-    "iterations": 1,
+    "best_ms": 37.7,
+    "best_speedup": 2.732,
+    "iterations": 7,
     "history": [
       {
         "version": 1,
         "ms": 37.8,
         "speedup": 2.725,
         "note": "fused single-pass (diff+square+reduce), float4, multi-block atomicAdd"
+      },
+      {
+        "version": 2,
+        "ms": 37.9,
+        "speedup": 2.718,
+        "note": "2x float4 ILP \u2014 no improvement"
+      },
+      {
+        "version": 3,
+        "ms": 37.7,
+        "speedup": 2.732,
+        "note": "512 blocks vs 2048 \u2014 marginal win, best"
+      },
+      {
+        "version": 4,
+        "ms": 37.9,
+        "speedup": 2.718,
+        "note": "64 blocks \u2014 worse than 512"
+      },
+      {
+        "version": 5,
+        "ms": 56.4,
+        "speedup": 1.826,
+        "note": "CUB DeviceReduce transform iterator \u2014 scalar loads, much slower"
+      },
+      {
+        "version": 6,
+        "ms": 37.8,
+        "speedup": 2.725,
+        "note": "two-pass no-atomics (512 blocks) \u2014 same as v1, atomics not bottleneck"
+      },
+      {
+        "version": 7,
+        "ms": 38.7,
+        "speedup": 2.661,
+        "note": "256t/2048b \u2014 worse"
       }
     ]
   },
@@ -535,13 +571,13 @@
         "version": 1,
         "ms": 74.4,
         "speedup": 1.922,
-        "note": "TF32 Tensor Cores via allow_tf32=True — PyTorch SDPA ignores TF32, raw bmm respects it. 3.6x faster GEMMs, max_diff < 5e-5 after softmax cancellation"
+        "note": "TF32 Tensor Cores via allow_tf32=True \u05d2\u20ac\u201d PyTorch SDPA ignores TF32, raw bmm respects it. 3.6x faster GEMMs, max_diff < 5e-5 after softmax cancellation"
       },
       {
         "version": 2,
         "ms": 64.3,
         "speedup": 2.224,
-        "note": "baddbmm(beta=0, alpha=scale) fuses scale into GEMM — saves separate mul_ kernel + memory round-trip on 1GB attention matrix"
+        "note": "baddbmm(beta=0, alpha=scale) fuses scale into GEMM \u05d2\u20ac\u201d saves separate mul_ kernel + memory round-trip on 1GB attention matrix"
       }
     ]
   }

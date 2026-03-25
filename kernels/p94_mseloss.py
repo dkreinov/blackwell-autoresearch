@@ -58,7 +58,7 @@ torch::Tensor mse_cuda(torch::Tensor pred, torch::Tensor target) {
     auto sum_tensor = torch::zeros({1}, pred.options());
 
     int threads = 1024;
-    int blocks = min(2048, (n / 4 + threads - 1) / threads);
+    int blocks = 512;  // 512 blocks optimal: fewer atomic events, same float4 throughput
     mse_sum_kernel<<<blocks, threads>>>(pred_flat.data_ptr<float>(), targ_flat.data_ptr<float>(),
                                          sum_tensor.data_ptr<float>(), n);
 

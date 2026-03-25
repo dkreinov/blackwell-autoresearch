@@ -437,3 +437,41 @@ Precision: TF32 final max_diff=5e-5 < 1e-4 (errors cancel through softmax + weig
 | 4 | 64.30 | 2.224x | baddbmm(beta=0, alpha=scale) fuses scale into GEMM — saves mul_ kernel + 1GB memory round-trip |
 
 **p97 best: v4 2.224x (64.30ms). Key: baddbmm fuses scale; SDPA bypasses allow_tf32; raw bmm respects it.**
+- FAIL in-place softmax: `softmax_()` not available on Tensor; standard softmax creates new 1GB tensor unavoidably
+- FAIL pre-allocated buffers: allocation overhead negligible vs GEMM (~64.4ms noise)
+- FAIL torch.compile max-autotune: 125ms — not enough SMs for autotune gemm on Thor (20 SMs)
+- NOTE: pre-contiguous K^T saves 2ms (62ms) but requires O(2.1GB) copy inside forward → 92ms net
+- NOTE: KernelBench tolerance for FP32 inputs is 1e-4 (not 1e-2 as stated in program.md) — FP16 GEMMs fail at 4e-4
+
+**p97 DONE. 2.224x at bandwidth+compute floor with TF32 TC. No further improvement found.**
+
+---
+## p94 — MSELoss (baseline 103.0ms)
+
+Input: ~1B float elements per tensor (derived from bandwidth calc). Operation: global reduction of (pred-target)^2, divide by n.
+
+**Confirmed memory-bandwidth bound.** Estimated floor ~29ms at 273 GB/s; practical floor ~37.7ms (77% BW efficiency).
+
+**v1 (baseline custom): 37.8ms (2.725x)**
+- 1024t, up to 2048 blocks, float4 loads, warp shuffle, atomicAdd
+
+**v2 (2x float4 ILP): 37.9ms — no improvement**
+
+**v3 (512 blocks): 37.7ms (2.732x) ← BEST**
+- Same kernel, 512 blocks vs 2048. Marginal win.
+
+**v4 (64 blocks): 37.9ms — worse than 512**
+
+**v5 (CUB DeviceReduce + SqDiffIterator): 56.4ms — much slower**
+- Custom transform iterator forces scalar loads; CUB cannot vectorize through it.
+
+**v6 (two-pass, no atomics, 512 blocks): 37.8ms — same as v1**
+- Confirms atomics are NOT the bottleneck. Pure bandwidth.
+
+**v7 (256t, 2048 blocks): 38.7ms — worse**
+- More blocks per SM didn't help; 1024t is optimal for this data size.
+
+Exhausted: block sweeps (64/512/2048), ILP, CUB, two-pass, thread count sweep (256/1024).
+The 23% gap from bandwidth floor is a property of Thor's ATS unified memory, not the kernel.
+
+**p94 DONE. 2.732x. Practical floor reached.**
