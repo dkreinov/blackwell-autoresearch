@@ -430,25 +430,25 @@
         "version": 1,
         "ms": 92.6,
         "speedup": 1.08,
-        "note": "online softmax, float4 8x unroll, 1024t — SFU-bound on expf"
+        "note": "online softmax, float4 8x unroll, 1024t \u05d2\u20ac\u201d SFU-bound on expf"
       },
       {
         "version": 2,
         "ms": 115.0,
         "speedup": 0.87,
-        "note": "3-pass separate max — extra pass overhead dominates, WORSE"
+        "note": "3-pass separate max \u05d2\u20ac\u201d extra pass overhead dominates, WORSE"
       },
       {
         "version": 3,
         "ms": 92.9,
         "speedup": 1.076,
-        "note": "512 threads (2 blocks/SM) — no improvement, SFU-bound"
+        "note": "512 threads (2 blocks/SM) \u05d2\u20ac\u201d no improvement, SFU-bound"
       },
       {
         "version": 4,
         "ms": 93.3,
         "speedup": 1.072,
-        "note": "256 threads (4 blocks/SM) — no improvement, SFU-bound"
+        "note": "256 threads (4 blocks/SM) \u05d2\u20ac\u201d no improvement, SFU-bound"
       }
     ]
   },
@@ -463,13 +463,13 @@
         "version": 1,
         "ms": 92.1,
         "speedup": 1.194,
-        "note": "online softmax + trivial normalize (x - offset, no expf in pass 2) — BEST"
+        "note": "online softmax + trivial normalize (x - offset, no expf in pass 2) \u05d2\u20ac\u201d BEST"
       },
       {
         "version": 2,
         "ms": 115.0,
         "speedup": 0.957,
-        "note": "3-pass separate max — extra pass overhead dominates, WORSE"
+        "note": "3-pass separate max \u05d2\u20ac\u201d extra pass overhead dominates, WORSE"
       }
     ]
   },
@@ -490,19 +490,19 @@
         "version": 2,
         "ms": 88.7,
         "speedup": 1.33,
-        "note": "4x float4 in pass1, 1x in pass2 — BEST"
+        "note": "4x float4 in pass1, 1x in pass2 \u05d2\u20ac\u201d BEST"
       },
       {
         "version": 3,
         "ms": 89.6,
         "speedup": 1.317,
-        "note": "8x float4 in both passes — slightly worse, boundary overhead dim=65535"
+        "note": "8x float4 in both passes \u05d2\u20ac\u201d slightly worse, boundary overhead dim=65535"
       },
       {
         "version": 4,
         "ms": 89.6,
         "speedup": 1.317,
-        "note": "4x float4 in both passes — pass2 unroll doesn't help (L2-bound not DRAM)"
+        "note": "4x float4 in both passes \u05d2\u20ac\u201d pass2 unroll doesn't help (L2-bound not DRAM)"
       }
     ]
   },
@@ -667,13 +667,13 @@
         "version": 1,
         "ms": 62.2,
         "speedup": 1.471,
-        "note": "1 block/channel, 1024t, 8x float4 both passes, FMA scale+shift — BEST"
+        "note": "1 block/channel, 1024t, 8x float4 both passes, FMA scale+shift \u05d2\u20ac\u201d BEST"
       },
       {
         "version": 2,
         "ms": 62.7,
         "speedup": 1.459,
-        "note": "512t — slightly worse (fewer iterations/block, same 64 blocks)"
+        "note": "512t \u05d2\u20ac\u201d slightly worse (fewer iterations/block, same 64 blocks)"
       }
     ]
   },
@@ -688,13 +688,13 @@
         "version": 1,
         "ms": 108.0,
         "speedup": 0.991,
-        "note": "1 block/group, 1024t, 8x float4, FMA trick — same as PyTorch"
+        "note": "1 block/group, 1024t, 8x float4, FMA trick \u05d2\u20ac\u201d same as PyTorch"
       },
       {
         "version": 2,
         "ms": 108.0,
         "speedup": 0.991,
-        "note": "512t — identical (DRAM-bound, group_size=8MB >> L2)"
+        "note": "512t \u05d2\u20ac\u201d identical (DRAM-bound, group_size=8MB >> L2)"
       }
     ]
   },
@@ -716,6 +716,42 @@
         "ms": 64.3,
         "speedup": 2.224,
         "note": "baddbmm(beta=0, alpha=scale) fuses scale into GEMM \u05d2\u20ac\u201d saves separate mul_ kernel + memory round-trip on 1GB attention matrix"
+      }
+    ]
+  },
+  "76": {
+    "name": "Conv1D_dilated_strided",
+    "baseline_ms": 181.0,
+    "best_ms": 181.0,
+    "best_speedup": 1.0,
+    "iterations": 6,
+    "history": [
+      {
+        "version": "note",
+        "ms": null,
+        "speedup": null,
+        "note": "All 6 approaches slower or incorrect. cuDNN already optimal. TF32 mm != cuDNN TF32 (max_diff=5.5e-4). FP32 GEMM=294ms (no Tensor Cores). cudnn.benchmark=215ms (worse algo). Direct CUDA=566ms (DRAM amplification)."
+      }
+    ]
+  },
+  "96": {
+    "name": "HuberLoss",
+    "baseline_ms": 69.0,
+    "best_ms": 36.4,
+    "best_speedup": 1.896,
+    "iterations": 2,
+    "history": [
+      {
+        "version": 1,
+        "ms": 36.6,
+        "speedup": 1.885,
+        "note": "fused single-pass huber+reduce, float4, 512 blocks, atomicAdd"
+      },
+      {
+        "version": 2,
+        "ms": 36.4,
+        "speedup": 1.896,
+        "note": "4096 blocks -- marginal win, bandwidth ceiling"
       }
     ]
   }

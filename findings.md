@@ -648,3 +648,44 @@ Pass 2 (DRAM → L2): fmaf(x, scale, shift) per element. At C=64 channels, per-c
 
 **p33 DONE. 1.471x. Fused 1-block-per-channel, 8x float4, FMA trick.**
 
+
+---
+## p76 — Conv1D dilated strided (baseline 181.0ms)
+
+Input: (64, 64, 524280) float32. Conv1d(in=64, out=128, K=3, stride=3, dilation=4). Output: (64, 128, 174758).
+
+**Four approaches tried, all slower or incorrect:**
+
+- v1 (unfold + TF32 mm, no fix): INCORRECT — shape bug in original unfold code
+- v2 (direct CUDA FP32 + no TF32 disable): INCORRECT — cuDNN TF32 reference ≠ custom FP32 kernel
+- v3 (direct CUDA FP32 + TF32 disabled): 566ms (0.320x) — 128 output-channel blocks can't share L2 input (only 120 blocks active at once), causes 128x DRAM amplification
+- v4 (unfold + FP32 mm + TF32 disabled): 294ms (0.616x) — FP32 GEMM uses SIMD not Tensor Cores (8 TFLOPS), cuDNN uses TF32 Tensor Cores
+- v5 (unfold + TF32 mm, no disable): INCORRECT — TF32 torch.mm ≠ cuDNN TF32 for this shape (max_diff=5.5e-4, 391M elements > 1e-4 absolute; output values near 0 fail allclose with atol=1e-4)
+- v6 (cudnn.benchmark=True): 215ms (0.842x) — benchmark picks a worse algorithm
+
+**Root cause: cuDNN conv1d uses TF32 Tensor Cores. Without Tensor Cores (FP32 GEMM), ~294ms. TF32 mm doesn't match cuDNN TF32 for this shape (different accumulation algorithm). cudnn.benchmark picks suboptimal algorithm.**
+
+**p76 DONE. No speedup. cuDNN already optimal for this shape.**
+
+
+---
+## p96 — HuberLoss (baseline 69.0ms)
+
+Input: predictions=(32768, 32768), targets=(32768, 32768), both float32. Operation: smooth_l1_loss (Huber, delta=1) with mean reduction. Total: 1.07B elements.
+
+**Fused single-pass approach (same as MSELoss 2.732x):**
+For each float4 pair: compute |d|, apply huber formula, accumulate. Multi-block atomicAdd to global sum. Divide by N.
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 1 | 36.60 | 1.885x | fused huber+reduce, float4, 512 blocks |
+| 2 | 36.40 | 1.896x | 4096 blocks — marginal, bandwidth ceiling |
+
+2x ILP (2 float4/thread/iter): 37.6ms — slower, confirms memory-bound.
+Block sweep (256→4096): flat curve, no sensitivity.
+
+**Bandwidth analysis:** 2 * 1.07B * 4B = 8.57 GB reads + 4B output write. At 273 GB/s: 31ms minimum. Achieved 36.4ms = 85% bandwidth efficiency.
+
+**p96 DONE. 1.896x. Fused single-pass Huber+reduce, float4, 4096 blocks.**
+Note: MSELoss got 2.732x (103ms→37.7ms) with same pattern because PyTorch MSE implementation was slower at baseline.
+
