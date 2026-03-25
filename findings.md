@@ -434,5 +434,6 @@ Precision: TF32 final max_diff=5e-5 < 1e-4 (errors cancel through softmax + weig
 | v | ms | speedup | change |
 |---|-----|---------|--------|
 | 3 | 74.40 | 1.922x | allow_tf32=True in __init__ — TF32 TC via raw bmm, 3.6x faster GEMMs, FP32 softmax |
+| 4 | 64.30 | 2.224x | baddbmm(beta=0, alpha=scale) fuses scale into GEMM — saves mul_ kernel + 1GB memory round-trip |
 
-**p97 best: v3 1.922x (74.40ms). Key: SDPA bypasses allow_tf32; raw bmm respects it.**
+**p97 best: v4 2.224x (64.30ms). Key: baddbmm fuses scale; SDPA bypasses allow_tf32; raw bmm respects it.**

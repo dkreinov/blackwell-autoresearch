@@ -527,15 +527,21 @@
   "97": {
     "name": "ScaledDotProductAttention",
     "baseline_ms": 143.0,
-    "best_ms": 74.4,
-    "best_speedup": 1.922,
-    "iterations": 1,
+    "best_ms": 64.3,
+    "best_speedup": 2.224,
+    "iterations": 2,
     "history": [
       {
         "version": 1,
         "ms": 74.4,
         "speedup": 1.922,
         "note": "TF32 Tensor Cores via allow_tf32=True — PyTorch SDPA ignores TF32, raw bmm respects it. 3.6x faster GEMMs, max_diff < 5e-5 after softmax cancellation"
+      },
+      {
+        "version": 2,
+        "ms": 64.3,
+        "speedup": 2.224,
+        "note": "baddbmm(beta=0, alpha=scale) fuses scale into GEMM — saves separate mul_ kernel + memory round-trip on 1GB attention matrix"
       }
     ]
   }
