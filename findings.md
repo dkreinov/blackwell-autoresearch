@@ -503,3 +503,26 @@ Key findings:
 - Practical floor ~94ms; theoretical floor ~63ms (1 DRAM read + 1 write at 273 GB/s)
 
 **p38 DONE. 2.036x. L2-reuse fused kernel with 8x unroll is the floor.**
+
+---
+## p36 — RMSNorm (baseline 172.0ms)
+
+Input: (112, 64, 512, 512) float32. C=64 features. Operation: x / sqrt(mean(x^2, dim=1) + eps).
+Total elements: 1.88 billion = 7.52 GB. Floor: 15 GB / 273 GB/s = 55ms.
+
+**Key insight: C=64 fits entirely in registers per thread (single-pass).**
+Each thread handles one (b,h,w) position. Loads all 64 channels into local registers (`float v[64]`), computes inv_rms = rsqrtf(sum/64+eps), writes 64 normalized values. One read + one write pass.
+
+Warp coalescing: 32 consecutive threads handle adjacent W positions → each channel load is 32 consecutive floats = perfectly coalesced. 64 channel loads × 128 bytes = 8 KB per warp.
+
+**v1 (256t, register-cached): 91.2ms (1.886x)**
+**v2 (512t, register-cached): 82.4ms (2.087x)** — more warps in-flight, better latency hiding
+**v3 (512t, two-pass, no register array): 87.7ms (1.961x)** — extra read costly
+**v4 (512t, __ldg + register-cached): 82.0ms (2.098x) ← BEST**
+**v5 (1024t): FAIL** — register spill at 1024t, local memory causes corruption
+**v6 (384t): 88.8ms** — fewer warps than 512t
+
+512t optimal: 2 blocks/SM, keeps 64 float registers per thread within register limits.
+Practical floor ~82ms; theoretical 55ms. Gap = strided C-dim access pattern overhead.
+
+**p36 DONE. 2.098x. Register-cached single-pass with 512t is the floor.**

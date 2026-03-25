@@ -326,45 +326,45 @@
   "36": {
     "name": "RMSNorm",
     "baseline_ms": 172.0,
-    "best_ms": 77.1,
-    "best_speedup": 2.231,
-    "iterations": 12,
+    "best_ms": 82.0,
+    "best_speedup": 2.098,
+    "iterations": 6,
     "history": [
       {
         "version": 1,
-        "ms": 85.8,
-        "speedup": 2.005,
-        "note": "single-pass, 64 features cached in registers, 256 threads, rsqrtf"
+        "ms": 91.2,
+        "speedup": 1.886,
+        "note": "256t, register-cached v[64], single pass"
+      },
+      {
+        "version": 2,
+        "ms": 82.4,
+        "speedup": 2.087,
+        "note": "512t, register-cached \u2014 512t = more warps in-flight"
+      },
+      {
+        "version": 3,
+        "ms": 87.7,
+        "speedup": 1.961,
+        "note": "512t, two-pass (no register array) \u2014 extra read costly"
+      },
+      {
+        "version": 4,
+        "ms": 82.0,
+        "speedup": 2.098,
+        "note": "512t, register-cached + __ldg \u2014 best"
       },
       {
         "version": 5,
-        "ms": 79.6,
-        "speedup": 2.161,
-        "note": "512 threads \u05d2\u20ac\u201d better thread-level parallelism"
+        "ms": null,
+        "speedup": null,
+        "note": "1024t \u2014 FAIL (register spill to local memory)"
       },
       {
         "version": 6,
-        "ms": 78.4,
-        "speedup": 2.194,
-        "note": "manual 4-way unroll with fmaf for sum_sq accumulation"
-      },
-      {
-        "version": 9,
-        "ms": 77.5,
-        "speedup": 2.219,
-        "note": "__launch_bounds__(512,1) \u05d2\u20ac\u201d 128 regs/thread, no spills"
-      },
-      {
-        "version": 11,
-        "ms": 77.4,
-        "speedup": 2.222,
-        "note": "4 independent FMA accumulators (ss0..ss3) to break dependency chain and enable ILP"
-      },
-      {
-        "version": 12,
-        "ms": 77.1,
-        "speedup": 2.231,
-        "note": "8-way unroll (vs 4-way) \u2014 more outstanding loads, better latency hiding"
+        "ms": 88.8,
+        "speedup": 1.937,
+        "note": "384t \u2014 worse than 512t"
       }
     ]
   },
