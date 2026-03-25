@@ -475,3 +475,31 @@ Exhausted: block sweeps (64/512/2048), ILP, CUB, two-pass, thread count sweep (2
 The 23% gap from bandwidth floor is a property of Thor's ATS unified memory, not the kernel.
 
 **p94 DONE. 2.732x. Practical floor reached.**
+
+---
+## p38 — L1Norm (baseline 193.0ms)
+
+Input: (32768, 65535) float32. Operation: x / mean(|x|, dim=1, keepdim=True).
+Row size: 65535 × 4 = 256 KB. Total data: 8.59 GB (x) + 8.59 GB (out).
+
+**Key insight: fused single kernel with L2 reuse.**
+PyTorch does 5 passes (abs → mean → div = 4–5 kernel ops). Two-kernel approach (abs_sum + divide) is 2 passes from DRAM, but launches two kernels → each pass reads from DRAM. Fusing into ONE kernel: pass 1 (abs-sum) fills L2 with the row, pass 2 (normalize) reads from L2. Effective DRAM traffic: 1 read + 1 write.
+
+**v1 (two kernels, 1024t): 165ms (1.170x)**
+**v2 (two kernels, 512t): 167ms (1.156x)**
+**v3 (fused, 1024t): 106ms (1.821x)** ← L2 reuse key discovery
+**v4 (fused + 4x unroll): 96.9ms (1.992x)**
+**v5 (fused + 8x unroll): 94.8ms (2.036x) ← BEST**
+**v6 (fused + 16x unroll): 95.9ms (2.013x)** — register pressure at 16x
+**v7 (dual accumulators + 16x): 96.1ms (2.008x)** — no improvement
+**v8 (512t + 8x unroll): 144ms (1.340x)** — more L2 working set (20MB vs 10MB), much worse
+**v9 (pragma unroll 8): 99ms (1.949x)** — manual unrolling superior
+
+Key findings:
+- 8x unroll optimal: thread handles exactly 64 elements, 8 full 8-wide iterations, no tail for most threads
+- 512 threads: 4 blocks/SM = 20MB L2 working set, reduces L2 hit rate for pass 2
+- 1024 threads: 2 blocks/SM = 10MB L2 working set, all rows stay cached between passes
+- dim=65535: NOT power of 2, NOT divisible by 4 → no float4 possible (row stride misaligned after row 0)
+- Practical floor ~94ms; theoretical floor ~63ms (1 DRAM read + 1 write at 273 GB/s)
+
+**p38 DONE. 2.036x. L2-reuse fused kernel with 8x unroll is the floor.**

@@ -263,27 +263,63 @@
   "38": {
     "name": "L1Norm",
     "baseline_ms": 193.0,
-    "best_ms": 90.0,
-    "best_speedup": 2.144,
-    "iterations": 3,
+    "best_ms": 94.8,
+    "best_speedup": 2.036,
+    "iterations": 9,
     "history": [
       {
         "version": 1,
-        "ms": 105.0,
-        "speedup": 1.838,
-        "note": "fused 3 PyTorch passes into 1 kernel, scalar loads, warp shuffle reduction, 1024 threads"
+        "ms": 165.0,
+        "speedup": 1.17,
+        "note": "two-kernel: row_abs_sum + row_l1norm, 1024t"
       },
       {
         "version": 2,
-        "ms": 90.6,
-        "speedup": 2.13,
-        "note": "float4 vectorized loads with per-row alignment handling"
+        "ms": 167.0,
+        "speedup": 1.156,
+        "note": "two-kernel, 512t \u2014 no improvement"
       },
       {
         "version": 3,
-        "ms": 90.0,
-        "speedup": 2.144,
-        "note": "4x float4 per iteration in pass1 body loop \u2014 better load pipelining"
+        "ms": 106.0,
+        "speedup": 1.821,
+        "note": "fused single kernel (L2 reuse), 1024t"
+      },
+      {
+        "version": 4,
+        "ms": 96.9,
+        "speedup": 1.992,
+        "note": "fused + 4x unroll"
+      },
+      {
+        "version": 5,
+        "ms": 94.8,
+        "speedup": 2.036,
+        "note": "fused + 8x unroll \u2014 best"
+      },
+      {
+        "version": 6,
+        "ms": 95.9,
+        "speedup": 2.013,
+        "note": "fused + 16x unroll \u2014 register pressure"
+      },
+      {
+        "version": 7,
+        "ms": 96.1,
+        "speedup": 2.008,
+        "note": "fused + dual accumulators + 16x \u2014 no improvement"
+      },
+      {
+        "version": 8,
+        "ms": 144.0,
+        "speedup": 1.34,
+        "note": "512t + 8x unroll \u2014 larger L2 working set, much worse"
+      },
+      {
+        "version": 9,
+        "ms": 99.0,
+        "speedup": 1.949,
+        "note": "pragma unroll 8 \u2014 worse than manual"
       }
     ]
   },
