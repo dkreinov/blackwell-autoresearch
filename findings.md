@@ -335,12 +335,33 @@ Same shape as p38: (32768, 65535). `x / norm(x, p=2, dim=1)` = `x * rsqrt(sum(x^
 
 | v | ms | speedup | change |
 |---|-----|---------|--------|
-| 1 | 90.50 | 1.304x | fused 2-pass, per-row sum(x^2), float4 aligned, rsqrtf, 1024 threads |
+| 1 | 90.50 | 1.304x | fused 2-pass, per-row sum(x^2), float4 aligned, rsqrtf, 1024t |
+| 2 | 88.70 | 1.330x | 4x float4 unroll in pass 1 — best |
+| 3 | 89.60 | 1.317x | 8x float4 in both passes — slightly worse (register pressure or boundary) |
+| 4 | 89.60 | 1.317x | 4x float4 in both passes — same as v3, pass2 unroll doesn't help |
 
-**p39 best: v1 1.304x (90.50ms). Same floor as p38 L1Norm — identical data movement pattern.**
+Pass 2 reads from L2 (5MB working set < 64MB). Not DRAM-bound in pass 2. Pass 2 unrolling provides no benefit.
+4x pass1 is optimal — 8x causes slightly more boundary overhead for dim=65535.
+
+**p39 DONE. 1.330x. 4x float4 pass1 + 1x pass2 is the ceiling.**
 
 ---
 
+## p35 — GroupNorm (baseline 107ms)
+
+Input: (112, 64, 512, 512), G=8 groups, 8 channels/group. Group size = 8×512×512 = 2,097,152 elems = 8MB.
+Total data: 7.16 GB. DRAM floor: 2 reads + 1 write = 78.6ms → 1.36x theoretical.
+NO L2 reuse: 20 concurrent blocks × 8MB = 160MB >> 64MB L2.
+
+**v1 (fused 2-pass, float4 8x unroll, 1024t): 108ms (0.991x)** — essentially same as PyTorch
+**v2 (512t): 108ms (0.991x)** — same, DRAM-bound regardless of thread count
+
+PyTorch GroupNorm is also using ~2-pass fused CUDA. Both are DRAM-bandwidth limited at same theoretical minimum.
+No meaningful improvement possible without reducing DRAM passes (which requires storing 8MB intermediate = impossible).
+
+**p35 DONE. 0.991x. Both PyTorch and custom are at the 2-pass DRAM ceiling.**
+
+---
 ## p37 FrobeniusNorm (baseline 98.5ms)
 
 Tensor: (112, 64, 512, 512) = 1.88B elements. Global norm then divide.
@@ -605,4 +626,25 @@ Unlike Softmax (where pass 2 computes expf for each element), LogSoftmax pass 2 
 Baseline PyTorch LogSoftmax (110ms) is slower than Softmax (100ms) because it uses log(softmax) which does log() per element or equivalent. Our kernel eliminates per-element log() entirely.
 
 **p24 DONE. 1.194x. Online max+sum + trivial pass-2 subtract is the ceiling.**
+
+---
+## p33 — BatchNorm2d (baseline 91.5ms)
+
+Input: (64, 64, 512, 512) float32. Operation: batch normalization over N=64 batch × C=64 channels × H=512 × W=512.
+
+**Key insight: 1 block per channel fuses all N slices.**
+PyTorch BN uses multiple kernel launches (mean, var, normalize). Our kernel launches 1 block per channel (64 blocks total) and processes all N=64 batch items in a single fused kernel, eliminating launch overhead and exploiting locality.
+
+Pass 1 (DRAM): outer loop over N=64 batch items, inner 8x float4 unroll per spatial slice. Each thread accumulates sum+sumsq over HW4=65536 float4s × 64 batches.
+Pass 2 (DRAM → L2): fmaf(x, scale, shift) per element. At C=64 channels, per-channel slice = 1 batch × 64 channels × HW = 64MB total → no L2 reuse across batches, but single kernel avoids PyTorch multi-kernel overhead.
+
+**v1 (1024t, 64 blocks = 1 per channel): 62.2ms (1.471x) ← BEST**
+- FMA trick: precompute scale = weight[c]*inv_std, shift = bias[c] - weight[c]*mean*inv_std
+- 8x float4 unroll in both passes
+
+**v2 (512t, 64 blocks = 1 per channel): 62.7ms (1.459x)** — slightly worse
+- With only 64 blocks, more threads/block gives better serial throughput per block.
+- 1024t vs 512t: 1024t processes each spatial slice in half the loop iterations.
+
+**p33 DONE. 1.471x. Fused 1-block-per-channel, 8x float4, FMA trick.**
 

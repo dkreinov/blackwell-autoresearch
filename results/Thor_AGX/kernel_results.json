@@ -478,19 +478,31 @@
     "baseline_ms": 118.0,
     "best_ms": 88.7,
     "best_speedup": 1.33,
-    "iterations": 2,
+    "iterations": 4,
     "history": [
       {
         "version": 1,
         "ms": 90.5,
         "speedup": 1.304,
-        "note": "fused 2-pass, per-row sum(x^2) reduction, float4 aligned, rsqrtf, 1024 threads"
+        "note": "fused 2-pass, per-row sum(x^2), float4 aligned, rsqrtf, 1024t"
       },
       {
         "version": 2,
         "ms": 88.7,
         "speedup": 1.33,
-        "note": "4x float4 per iteration in pass1 \u2014 better load pipelining"
+        "note": "4x float4 in pass1, 1x in pass2 — BEST"
+      },
+      {
+        "version": 3,
+        "ms": 89.6,
+        "speedup": 1.317,
+        "note": "8x float4 in both passes — slightly worse, boundary overhead dim=65535"
+      },
+      {
+        "version": 4,
+        "ms": 89.6,
+        "speedup": 1.317,
+        "note": "4x float4 in both passes — pass2 unroll doesn't help (L2-bound not DRAM)"
       }
     ]
   },
@@ -641,6 +653,48 @@
         "ms": 38.1,
         "speedup": 2.887,
         "note": "1024 threads, 1 float4/thread per tile, 4 local vals, 1 block/SM but minimal reg pressure"
+      }
+    ]
+  },
+  "33": {
+    "name": "BatchNorm2d",
+    "baseline_ms": 91.5,
+    "best_ms": 62.2,
+    "best_speedup": 1.471,
+    "iterations": 2,
+    "history": [
+      {
+        "version": 1,
+        "ms": 62.2,
+        "speedup": 1.471,
+        "note": "1 block/channel, 1024t, 8x float4 both passes, FMA scale+shift — BEST"
+      },
+      {
+        "version": 2,
+        "ms": 62.7,
+        "speedup": 1.459,
+        "note": "512t — slightly worse (fewer iterations/block, same 64 blocks)"
+      }
+    ]
+  },
+  "35": {
+    "name": "GroupNorm",
+    "baseline_ms": 107.0,
+    "best_ms": 108.0,
+    "best_speedup": 0.991,
+    "iterations": 2,
+    "history": [
+      {
+        "version": 1,
+        "ms": 108.0,
+        "speedup": 0.991,
+        "note": "1 block/group, 1024t, 8x float4, FMA trick — same as PyTorch"
+      },
+      {
+        "version": 2,
+        "ms": 108.0,
+        "speedup": 0.991,
+        "note": "512t — identical (DRAM-bound, group_size=8MB >> L2)"
       }
     ]
   },
