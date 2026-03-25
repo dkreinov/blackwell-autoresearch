@@ -273,13 +273,13 @@ Features strided by spatial_size (262144), but adjacent threads access adjacent 
 | 12 | 77.10 | 2.231x | 8-way unroll â€” more outstanding loads per iteration, better latency hiding |
 
 **p36 best: v12 2.231x (77.10ms). Key: single-pass, 512 threads, launch_bounds(512,1), 4 accumulators, 8-way unroll.**
-- FAIL v13: 16-way unroll 8 accumulators (78.70ms 2.186x) — too many live registers cause spills
-- FAIL v14: 4-threads-per-spatial, vals[16] (146ms 1.178x) — coalescing broken: non-adjacent warp threads per spatial
-- FAIL v15: 768 threads + launch_bounds(768,2) (174ms 0.989x) — 85 regs/thread cap forces spill for vals[64]
-- FAIL v16: float* row_ptr + int32 offset (77.50ms 2.219x) — compiler already optimizes int64, no gain
-- FAIL v17: #pragma unroll on 8-way loops (77.20ms 2.228x) — within noise, already unrolled by -O3
-- FAIL v18: no bounds check exact grid (79.90ms 2.153x) — removing branch changes code gen, slightly worse
-- FAIL v19: (reserved — p36 at bandwidth ceiling, 77.1ms = 71% of 54.9ms theoretical)
+- FAIL v13: 16-way unroll 8 accumulators (78.70ms 2.186x) ï¿½ too many live registers cause spills
+- FAIL v14: 4-threads-per-spatial, vals[16] (146ms 1.178x) ï¿½ coalescing broken: non-adjacent warp threads per spatial
+- FAIL v15: 768 threads + launch_bounds(768,2) (174ms 0.989x) ï¿½ 85 regs/thread cap forces spill for vals[64]
+- FAIL v16: float* row_ptr + int32 offset (77.50ms 2.219x) ï¿½ compiler already optimizes int64, no gain
+- FAIL v17: #pragma unroll on 8-way loops (77.20ms 2.228x) ï¿½ within noise, already unrolled by -O3
+- FAIL v18: no bounds check exact grid (79.90ms 2.153x) ï¿½ removing branch changes code gen, slightly worse
+- FAIL v19: (reserved ï¿½ p36 at bandwidth ceiling, 77.1ms = 71% of 54.9ms theoretical)
 
 ---
 
@@ -349,12 +349,12 @@ Tensor: (112, 64, 512, 512) = 1.88B elements. Global norm then divide.
 |---|-----|---------|--------|
 | 1 | 96.30 | 1.023x | multi-block atomicAdd + elementwise normalize, float4 |
 
-- FAIL v2: 2048-block grid-stride both phases (109ms 0.904x) — grid-stride loop overhead kills bandwidth
-- FAIL v3: 1024-block grid-stride phase2 only (110ms 0.895x) — same issue
-- FAIL v4: 4x float4/iter phase1 (97.70ms 1.008x) — conditional loads slow
+- FAIL v2: 2048-block grid-stride both phases (109ms 0.904x) ï¿½ grid-stride loop overhead kills bandwidth
+- FAIL v3: 1024-block grid-stride phase2 only (110ms 0.895x) ï¿½ same issue
+- FAIL v4: 4x float4/iter phase1 (97.70ms 1.008x) ï¿½ conditional loads slow
 
 **p37 best: v1 1.023x (96.30ms). Minimal gain â€” PyTorch already efficient for global reduction.**
-**p37 best: v1 1.023x (96.30ms). Phase2 with 459K tiny blocks is optimal — no loop overhead per thread.**
+**p37 best: v1 1.023x (96.30ms). Phase2 with 459K tiny blocks is optimal ï¿½ no loop overhead per thread.**
 ---
 
 ## p94 MSELoss (baseline 103.0ms)
@@ -420,3 +420,19 @@ Tensor: (32768, 32768). Cumsum of x*mask along dim=1, mask is Bool.
 - KEY INSIGHT: eval harness converts all inputs to Float32 on CUDA before passing to ModelNew. Must convert mask to uint8 in Python forward() before passing to C++ extension.
 
 | 3 | 74.10 | 1.221x | tile-based fwd cumsum, scalar uint8 mask loads, 1024 threads, 8 tiles of 4096 elems, Python converts mask.to(torch.uint8) before passing |
+
+---
+
+## p97 ScaledDotProductAttention (baseline 143.0ms)
+
+Inputs: Q, K, V: (32, 32, 512, 1024). Two GEMMs dominate: Q@K^T + A@V with batch=1024.
+DISCOVERY: allow_tf32=False by default. PyTorch SDPA ignores allow_tf32 (FP32 CUDA cores, 104ms+92ms). Raw torch.bmm respects it: TF32 TC 3.6x faster (29ms per GEMM).
+Precision: TF32 final max_diff=5e-5 < 1e-4 (errors cancel through softmax + weighted sum).
+- FAIL v1: FP16 SDPA -- max_diff=4e-4 > 1e-4, head_dim=1024 exceeds Flash Attention limit, SDPA uses math attention in FP16 with too much error
+- FAIL v2: FP16 bmm + FP32 softmax -- max_diff=4e-4 > 1e-4 (FP16 input rounding Ã— 1024 accumulated products)
+
+| v | ms | speedup | change |
+|---|-----|---------|--------|
+| 3 | 74.40 | 1.922x | allow_tf32=True in __init__ â€” TF32 TC via raw bmm, 3.6x faster GEMMs, FP32 softmax |
+
+**p97 best: v3 1.922x (74.40ms). Key: SDPA bypasses allow_tf32; raw bmm respects it.**

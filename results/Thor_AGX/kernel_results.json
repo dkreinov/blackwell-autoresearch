@@ -523,5 +523,20 @@
         "note": "1024 threads, 1 float4/thread per tile, 4 local vals, 1 block/SM but minimal reg pressure"
       }
     ]
+  },
+  "97": {
+    "name": "ScaledDotProductAttention",
+    "baseline_ms": 143.0,
+    "best_ms": 74.4,
+    "best_speedup": 1.922,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 74.4,
+        "speedup": 1.922,
+        "note": "TF32 Tensor Cores via allow_tf32=True — PyTorch SDPA ignores TF32, raw bmm respects it. 3.6x faster GEMMs, max_diff < 5e-5 after softmax cancellation"
+      }
+    ]
   }
 }
