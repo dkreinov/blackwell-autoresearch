@@ -38,7 +38,7 @@
 | 24 | LogSoftmax | 110.0ms | 92.1ms | **1.194x** | Online softmax + trivial pass-2 |
 | 23 | Softmax | 100.0ms | 92.6ms | **1.080x** | Online softmax (SFU-bound on expf) |
 
-Plus 13 elementwise activations (p19–p32) at 1.016–1.032x via float4 vectorization. See [reports/06](reports/06_activation_optimization.md) and [reports/07](reports/07_heavy_kernel_optimization.md) for full details.
+Plus 13 elementwise activations (p19–p32) at 1.016–1.032x via float4 vectorization. See [reports/06](reports/06_activation_optimization.md) and [reports/07](reports/07_heavy_kernel_optimization.md) for full details. For analysis of which optimizations are Thor-specific vs universally portable, see [reports/08](reports/08_thor_vs_h100_transferability.md).
 
 ### Key Optimization Patterns
 
@@ -127,6 +127,7 @@ One failure in both modes: problem #95 (CrossEntropyLoss) -- `nll_loss` kernel n
 |   |-- 05_power_characterization.md    # MAXN vs 120W power analysis
 |   |-- 06_activation_optimization.md   # 13 activation kernels optimized
 |   |-- 07_heavy_kernel_optimization.md # 17 heavy kernels (norms, losses, scans, attention)
+|   |-- 08_thor_vs_h100_transferability.md # Which optimizations transfer from H100 to Thor
 |-- scripts/
 |   |-- eval_kernel.py                  # Per-problem kernel eval (correctness + benchmark)
 |   |-- run_baseline_timing.py          # Baseline timing with timeout/OOM handling
