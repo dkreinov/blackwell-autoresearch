@@ -369,23 +369,53 @@
     ]
   },
   "34": {
-    "name": "InstanceNorm",
+    "name": "InstanceNorm2d",
     "baseline_ms": 135.0,
-    "best_ms": 96.1,
-    "best_speedup": 1.405,
-    "iterations": 5,
+    "best_ms": 98.1,
+    "best_speedup": 1.376,
+    "iterations": 7,
     "history": [
       {
         "version": 1,
-        "ms": 97.9,
-        "speedup": 1.379,
-        "note": "fused 2-pass, 1 block per instance, float4, warp shuffle reduction, 1024 threads"
+        "ms": 98.1,
+        "speedup": 1.376,
+        "note": "fused float4 8x unroll, 1 block per (b,c), L2 reuse \u2014 best"
+      },
+      {
+        "version": 2,
+        "ms": 109.0,
+        "speedup": 1.239,
+        "note": "512t \u2014 80MB L2 working set > 64MB, worse"
+      },
+      {
+        "version": 3,
+        "ms": 98.4,
+        "speedup": 1.372,
+        "note": "FMA bias trick \u2014 same as v1, memory-bound"
+      },
+      {
+        "version": 4,
+        "ms": 108.0,
+        "speedup": 1.25,
+        "note": "F.layer_norm \u2014 worse than custom"
       },
       {
         "version": 5,
-        "ms": 96.1,
-        "speedup": 1.405,
-        "note": "4x float4 per thread per iteration \u2014 more outstanding loads, better latency hiding"
+        "ms": 109.0,
+        "speedup": 1.239,
+        "note": "two separate kernels \u2014 worse L2 hit (slice evicted between launches)"
+      },
+      {
+        "version": 6,
+        "ms": 102.0,
+        "speedup": 1.324,
+        "note": "4x unroll \u2014 worse than 8x"
+      },
+      {
+        "version": 7,
+        "ms": 100.0,
+        "speedup": 1.35,
+        "note": "16x unroll \u2014 register pressure, worse than 8x"
       }
     ]
   },

@@ -6,88 +6,96 @@ cuda_source = """
 #include <torch/extension.h>
 #include <cuda_runtime.h>
 
-// v5: 4x float4 per thread per stride loop iteration (64 floats vs 16 floats).
-// 65536 float4s / 1024 threads = 64 iters → 16 iters with 4x unroll.
-// More outstanding loads per issued instruction, better latency hiding.
-__global__ __launch_bounds__(1024)
-void instancenorm_kernel(const float* __restrict__ x, float* __restrict__ out,
-                          int instances, int spatial, float eps) {
-    int inst = blockIdx.x;
-    if (inst >= instances) return;
-    int tid = threadIdx.x;
-    long long base = (long long)inst * spatial;
+__global__ void instancenorm_v3(const float* __restrict__ x, float* __restrict__ out,
+                                  int HW, float eps) {
+    const float* row = x   + (int64_t)blockIdx.x * HW;
+    float*       op  = out + (int64_t)blockIdx.x * HW;
+    int n4 = HW >> 2;
+    const float4* row4 = reinterpret_cast<const float4*>(row);
+    float4* out4 = reinterpret_cast<float4*>(op);
 
-    int spatial4 = spatial >> 2;
-    const float4* in4 = reinterpret_cast<const float4*>(x + base);
+    int stride = blockDim.x;
+    int stride8 = 8 * stride;
 
-    float local_sum = 0.0f, local_sq = 0.0f;
-    // 4x unrolled stride loop: 4 float4s per thread per iteration
-    int stride4 = blockDim.x;
-    for (int i = tid; i < spatial4; i += stride4 * 4) {
-        float4 a = in4[i];
-        float4 b = (i + stride4   < spatial4) ? in4[i + stride4  ] : make_float4(0,0,0,0);
-        float4 c = (i + stride4*2 < spatial4) ? in4[i + stride4*2] : make_float4(0,0,0,0);
-        float4 d = (i + stride4*3 < spatial4) ? in4[i + stride4*3] : make_float4(0,0,0,0);
-        local_sum += a.x+a.y+a.z+a.w + b.x+b.y+b.z+b.w + c.x+c.y+c.z+c.w + d.x+d.y+d.z+d.w;
-        local_sq  += a.x*a.x+a.y*a.y+a.z*a.z+a.w*a.w
-                   + b.x*b.x+b.y*b.y+b.z*b.z+b.w*b.w
-                   + c.x*c.x+c.y*c.y+c.z*c.z+c.w*c.w
-                   + d.x*d.x+d.y*d.y+d.z*d.z+d.w*d.w;
+    // Pass 1: float4, 8x unrolled, dual accumulators
+    float s1 = 0.0f, s2 = 0.0f;
+    int j = threadIdx.x;
+    for (; j + 7 * stride < n4; j += stride8) {
+        float4 a = row4[j],          b = row4[j+stride];
+        float4 c = row4[j+2*stride], d = row4[j+3*stride];
+        float4 e = row4[j+4*stride], f = row4[j+5*stride];
+        float4 g = row4[j+6*stride], h = row4[j+7*stride];
+        s1 += a.x+a.y+a.z+a.w + b.x+b.y+b.z+b.w + c.x+c.y+c.z+c.w + d.x+d.y+d.z+d.w
+            + e.x+e.y+e.z+e.w + f.x+f.y+f.z+f.w + g.x+g.y+g.z+g.w + h.x+h.y+h.z+h.w;
+        s2 += a.x*a.x+a.y*a.y+a.z*a.z+a.w*a.w + b.x*b.x+b.y*b.y+b.z*b.z+b.w*b.w
+            + c.x*c.x+c.y*c.y+c.z*c.z+c.w*c.w + d.x*d.x+d.y*d.y+d.z*d.z+d.w*d.w
+            + e.x*e.x+e.y*e.y+e.z*e.z+e.w*e.w + f.x*f.x+f.y*f.y+f.z*f.z+f.w*f.w
+            + g.x*g.x+g.y*g.y+g.z*g.z+g.w*g.w + h.x*h.x+h.y*h.y+h.z*h.z+h.w*h.w;
+    }
+    for (; j < n4; j += stride) {
+        float4 v = row4[j];
+        s1 += v.x+v.y+v.z+v.w;
+        s2 += v.x*v.x+v.y*v.y+v.z*v.z+v.w*v.w;
     }
 
-    // Warp reduction
-    for (int offset = 16; offset > 0; offset >>= 1) {
-        local_sum += __shfl_down_sync(0xffffffff, local_sum, offset);
-        local_sq  += __shfl_down_sync(0xffffffff, local_sq,  offset);
-    }
+    __shared__ float ws1[32], ws2[32];
+    __shared__ float bias_sh, is_sh;
+    int lane = threadIdx.x & 31, wid = threadIdx.x >> 5;
 
-    __shared__ float warp_sum[32], warp_sq[32];
-    int lane = tid & 31, warp_id = tid >> 5;
-    if (lane == 0) { warp_sum[warp_id] = local_sum; warp_sq[warp_id] = local_sq; }
+    for (int off = 16; off > 0; off >>= 1) {
+        s1 += __shfl_down_sync(0xffffffff, s1, off);
+        s2 += __shfl_down_sync(0xffffffff, s2, off);
+    }
+    if (lane == 0) { ws1[wid] = s1; ws2[wid] = s2; }
     __syncthreads();
 
-    float block_sum = 0.0f, block_sq = 0.0f;
-    if (warp_id == 0) {
-        block_sum = (lane < 32) ? warp_sum[lane] : 0.0f;
-        block_sq  = (lane < 32) ? warp_sq[lane]  : 0.0f;
-        for (int offset = 16; offset > 0; offset >>= 1) {
-            block_sum += __shfl_down_sync(0xffffffff, block_sum, offset);
-            block_sq  += __shfl_down_sync(0xffffffff, block_sq,  offset);
+    if (wid == 0) {
+        int nw = blockDim.x >> 5;
+        s1 = (lane < nw) ? ws1[lane] : 0.0f;
+        s2 = (lane < nw) ? ws2[lane] : 0.0f;
+        for (int off = 16; off > 0; off >>= 1) {
+            s1 += __shfl_down_sync(0xffffffff, s1, off);
+            s2 += __shfl_down_sync(0xffffffff, s2, off);
+        }
+        if (lane == 0) {
+            float mu = s1 / (float)HW;
+            float var = s2 / (float)HW - mu * mu;
+            float is = rsqrtf(var + eps);
+            is_sh = is;
+            bias_sh = -mu * is;  // FMA: out = x*is + bias
         }
     }
-
-    __shared__ float s_mean, s_inv_std;
-    if (tid == 0) {
-        float mean = block_sum / (float)spatial;
-        float var  = block_sq  / (float)spatial - mean * mean;
-        s_mean    = mean;
-        s_inv_std = rsqrtf(var + eps);
-    }
     __syncthreads();
-    float mean = s_mean, inv_std = s_inv_std;
 
-    // Pass 2: normalize
-    float4* out4 = reinterpret_cast<float4*>(out + base);
-    for (int i = tid; i < spatial4; i += blockDim.x) {
-        float4 v = in4[i];
-        float4 r;
-        r.x = (v.x - mean) * inv_std;
-        r.y = (v.y - mean) * inv_std;
-        r.z = (v.z - mean) * inv_std;
-        r.w = (v.w - mean) * inv_std;
-        out4[i] = r;
+    // Pass 2: float4, 8x unrolled, FMA normalize
+    float is = is_sh, bias = bias_sh;
+    j = threadIdx.x;
+    for (; j + 7 * stride < n4; j += stride8) {
+        float4 a = row4[j],          b = row4[j+stride];
+        float4 c = row4[j+2*stride], d = row4[j+3*stride];
+        float4 e = row4[j+4*stride], f = row4[j+5*stride];
+        float4 g = row4[j+6*stride], h = row4[j+7*stride];
+        out4[j]          = {fmaf(a.x,is,bias),fmaf(a.y,is,bias),fmaf(a.z,is,bias),fmaf(a.w,is,bias)};
+        out4[j+stride]   = {fmaf(b.x,is,bias),fmaf(b.y,is,bias),fmaf(b.z,is,bias),fmaf(b.w,is,bias)};
+        out4[j+2*stride] = {fmaf(c.x,is,bias),fmaf(c.y,is,bias),fmaf(c.z,is,bias),fmaf(c.w,is,bias)};
+        out4[j+3*stride] = {fmaf(d.x,is,bias),fmaf(d.y,is,bias),fmaf(d.z,is,bias),fmaf(d.w,is,bias)};
+        out4[j+4*stride] = {fmaf(e.x,is,bias),fmaf(e.y,is,bias),fmaf(e.z,is,bias),fmaf(e.w,is,bias)};
+        out4[j+5*stride] = {fmaf(f.x,is,bias),fmaf(f.y,is,bias),fmaf(f.z,is,bias),fmaf(f.w,is,bias)};
+        out4[j+6*stride] = {fmaf(g.x,is,bias),fmaf(g.y,is,bias),fmaf(g.z,is,bias),fmaf(g.w,is,bias)};
+        out4[j+7*stride] = {fmaf(h.x,is,bias),fmaf(h.y,is,bias),fmaf(h.z,is,bias),fmaf(h.w,is,bias)};
+    }
+    for (; j < n4; j += stride) {
+        float4 v = row4[j];
+        out4[j] = {fmaf(v.x,is,bias),fmaf(v.y,is,bias),fmaf(v.z,is,bias),fmaf(v.w,is,bias)};
     }
 }
 
 torch::Tensor instancenorm_cuda(torch::Tensor x, float eps) {
-    auto out = torch::empty_like(x);
-    int batch = x.size(0);
-    int features = x.size(1);
-    int spatial = x.size(2) * x.size(3);
-    int instances = batch * features;
-
-    instancenorm_kernel<<<instances, 1024>>>(x.data_ptr<float>(), out.data_ptr<float>(),
-                                              instances, spatial, eps);
+    auto xc = x.contiguous();
+    int B = xc.size(0), C = xc.size(1);
+    int HW = xc.size(2) * xc.size(3);
+    auto out = torch::empty_like(xc);
+    instancenorm_v3<<<B * C, 1024>>>(xc.data_ptr<float>(), out.data_ptr<float>(), HW, eps);
     return out;
 }
 """
@@ -95,7 +103,7 @@ torch::Tensor instancenorm_cuda(torch::Tensor x, float eps) {
 cpp_source = "torch::Tensor instancenorm_cuda(torch::Tensor x, float eps);"
 
 instancenorm_module = load_inline(
-    name='instancenorm_v5',
+    name='instancenorm_v3',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
     functions=['instancenorm_cuda'],
@@ -105,8 +113,8 @@ instancenorm_module = load_inline(
 
 class ModelNew(nn.Module):
     def __init__(self, num_features: int):
-        super(ModelNew, self).__init__()
+        super().__init__()
         self.eps = 1e-5
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         return instancenorm_module.instancenorm_cuda(x.cuda(), self.eps)

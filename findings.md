@@ -526,3 +526,32 @@ Warp coalescing: 32 consecutive threads handle adjacent W positions → each cha
 Practical floor ~82ms; theoretical 55ms. Gap = strided C-dim access pattern overhead.
 
 **p36 DONE. 2.098x. Register-cached single-pass with 512t is the floor.**
+
+---
+## p34 — InstanceNorm2d (baseline 135.0ms)
+
+Input: (112, 64, 512, 512) float32. Operation: normalize each (b,c) slice over H×W=262144 spatial dims.
+Total: 7168 slices × 262144 elements = 7.52 GB. Slice size: 1 MB. 
+Floor: 2 reads + 1 write = 22.56 GB / 273 GB/s = 82.6ms (no L2), or 15.04 GB / 273 = 55ms (with L2 reuse).
+
+**Key insight: fused 2-pass L2-reuse kernel with float4.**
+Each block handles one (b,c) slice:
+- Pass 1: float4 8x-unrolled, compute sum + sum_sq simultaneously → mean, var
+- Pass 2: float4 8x-unrolled FMA normalize, reads from L2 cache
+
+HW=262144 IS divisible by 4 → all slices are 16-byte aligned → float4 works.
+
+**v1 (fused float4 8x unroll, 1024t): 98.1ms (1.376x) ← BEST**
+**v2 (512t): 109ms** — 80 concurrent blocks × 1 MB = 80 MB > L2 capacity, evicts
+**v3 (FMA bias): 98.4ms** — same as v1, memory-bound, FMA doesn't help
+**v4 (F.layer_norm): 108ms** — slower than custom
+**v5 (two separate kernels): 109ms** — no L2 reuse between launches
+**v6 (4x unroll): 102ms** — worse than 8x
+**v7 (16x unroll): 100ms** — register pressure
+
+1024t optimal: 40 concurrent blocks × 1 MB = 40 MB < 64 MB L2 → slice cached between passes.
+512t too many concurrent blocks (80 × 1 MB = 80 MB > L2).
+8x unroll is optimal for 64 float4s per thread (8 full iterations).
+Practical floor ~98ms; theoretical 55ms. Gap: larger slice (1 MB) causes more L2 pressure than p38 (256 KB).
+
+**p34 DONE. 1.376x. L2-reuse fused float4 kernel is the floor.**
