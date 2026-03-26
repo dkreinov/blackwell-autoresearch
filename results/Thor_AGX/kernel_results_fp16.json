@@ -137,9 +137,9 @@
   "36": {
     "name": "RMSNorm",
     "baseline_ms": 105.0,
-    "best_ms": 41.0,
-    "best_speedup": 2.561,
-    "iterations": 3,
+    "best_ms": 40.5,
+    "best_speedup": 2.593,
+    "iterations": 4,
     "history": [
       {
         "version": 1,
@@ -158,6 +158,12 @@
         "ms": 41.0,
         "speedup": 2.561,
         "note": "__ldcg reads + __stcs (streaming evict-first) writes, 512t"
+      },
+      {
+        "version": 4,
+        "ms": 40.5,
+        "speedup": 2.593,
+        "note": "__ldlu (evict-after-use) reads + __stcs writes, 512t -- best cache policy found"
       }
     ]
   },
