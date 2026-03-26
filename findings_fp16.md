@@ -18,6 +18,10 @@ fp16 baseline: 27.7ms (fp32 baseline: 57.5ms)
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
 
+- FAIL custom kernels: all activations at ~28ms baseline are already at the bandwidth floor with PyTorch's vectorized fp16 kernels. Using __stwt on bandwidth-bound kernels causes SLOWDOWN (p21 Sigmoid: 61.8ms with __stwt vs 27.5ms baseline, p22 Tanh: 38.4ms vs 27.8ms, p32 HardTanh: 65.4ms vs 27.7ms). __stwt only helps compute-bound streaming kernels where write-combining isn't critical.
+- KEY INSIGHT: __stwt is harmful for bandwidth-bound kernels. Only use when compute > memory (e.g., Softsign/Swish where baseline was 96.9ms/69ms, not 28ms).
+- FLOOR: ~27-28ms. PyTorch already optimal at the bandwidth floor for these simple activations.
+
 ### p20 LeakyReLU (fp16)
 
 fp16 baseline: 27.8ms (fp32 baseline: 56.6ms)
@@ -31,6 +35,9 @@ fp16 baseline: 27.5ms (fp32 baseline: 56.6ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.90 | 1.022x | float4 (8 halfs), float32 __fdividef(1,1+__expf(-x)), default loads/stores, 1024t |
+
+- FAIL v0 (61.8ms with __stwt): __stwt caused 2.25x slowdown for bandwidth-bound kernel -- use default stores
 
 ### p22 Tanh (fp16)
 
@@ -38,6 +45,9 @@ fp16 baseline: 27.8ms (fp32 baseline: 56.8ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.90 | 1.033x | float4 (8 halfs), float32 __tanhf, default loads/stores, 1024t |
+
+- FAIL __stwt (38.4ms, 0.724x): bandwidth-bound, __stwt harmful
 
 ### p23 Softmax (fp16)
 
@@ -73,6 +83,7 @@ fp16 baseline: 27.7ms (fp32 baseline: 56.8ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.90 | 1.030x | float4 (8 halfs), float32 GELU-tanh approx, default loads/stores, 1024t |
 
 ### p27 SELU (fp16)
 
@@ -80,6 +91,7 @@ fp16 baseline: 27.7ms (fp32 baseline: 56.8ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.90 | 1.030x | float4 (8 halfs), float32 scale*(x if x>0 else alpha*(__expf(x)-1)), default loads/stores, 1024t |
 
 ### p28 HardSigmoid (fp16)
 
@@ -110,6 +122,7 @@ fp16 baseline: 27.7ms (fp32 baseline: 56.5ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.90 | 1.030x | float4 (8 halfs), float32 x if x>0 else alpha*(__expf(x)-1), default loads/stores, 1024t |
 
 ### p32 HardTanh (fp16)
 

@@ -18,18 +18,24 @@
   "21": {
     "name": "Sigmoid",
     "baseline_ms": 27.5,
-    "best_ms": 27.5,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.9,
+    "best_speedup": 1.022,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.9, "speedup": 1.022,
+       "note": "float4 (8 halfs), float32 1/(1+__expf(-x)), default loads/stores, 1024t (no __stwt -- __stwt caused 2.25x slowdown)"}
+    ]
   },
   "22": {
     "name": "Tanh",
     "baseline_ms": 27.8,
-    "best_ms": 27.8,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.9,
+    "best_speedup": 1.033,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.9, "speedup": 1.033,
+       "note": "float4 (8 halfs), float32 __tanhf, default loads/stores, 1024t (no __stwt)"}
+    ]
   },
   "23": {
     "name": "Softmax",
@@ -85,18 +91,24 @@
   "26": {
     "name": "GELU",
     "baseline_ms": 27.7,
-    "best_ms": 27.7,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.9,
+    "best_speedup": 1.030,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.9, "speedup": 1.030,
+       "note": "float4 (8 halfs), float32 GELU approx (0.5*x*(1+tanh(C0*(x+C1*x^3)))), default loads/stores, 1024t"}
+    ]
   },
   "27": {
     "name": "SELU",
     "baseline_ms": 27.7,
-    "best_ms": 27.7,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.9,
+    "best_speedup": 1.030,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.9, "speedup": 1.030,
+       "note": "float4 (8 halfs), float32 scale*(x if x>0 else alpha*(__expf(x)-1)), default loads/stores, 1024t"}
+    ]
   },
   "28": {
     "name": "HardSigmoid",
@@ -139,10 +151,13 @@
   "31": {
     "name": "ELU",
     "baseline_ms": 27.7,
-    "best_ms": 27.7,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.9,
+    "best_speedup": 1.030,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.9, "speedup": 1.030,
+       "note": "float4 (8 halfs), float32 x if x>0 else alpha*(__expf(x)-1), default loads/stores, 1024t"}
+    ]
   },
   "32": {
     "name": "HardTanh",
