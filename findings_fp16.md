@@ -144,6 +144,12 @@ fp16 baseline: 105.0ms (fp32 baseline: 172.0ms)
 - FAIL v6 (48.4ms): 2 positions per thread, 256t -- doubles register pressure, register spilling to L2
 - FAIL v7 (46.5ms): 128 threads -- 6 blocks/SM but worse performance, 512t remains best
 - FLOOR: 41.6ms (2.524x). All block sizes tried (128/256/512); 512t optimal. 1024t broken (65536 register limit).
+- FAIL v9 (43.9ms): __ldlu+__stwt with 256t -- worse despite extra L2 parallelism
+- FAIL v11 (tied 36.6ms): 1024t with half2[32] -- identical to 512t
+- FAIL v12 (46.4ms): #pragma unroll 4 -- partial unroll breaks latency hiding, full unroll required
+- FAIL v13 (37.7ms): __launch_bounds__(512,2) -- compiler hint hurts
+- FAIL v14 (36.7ms): separate load/accumulate phases -- compiler already does this
+- KEY INSIGHT: __ldlu+__stwt pattern: evict-after-read + bypass-all-caches for write = best for streaming kernels
 
 ### p37 FrobeniusNorm (fp16)
 
