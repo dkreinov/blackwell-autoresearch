@@ -134,6 +134,7 @@ fp16 baseline: 105.0ms (fp32 baseline: 172.0ms)
 | 2 | 41.30 | 2.542x | __ldcg (L2-only cache) for reads -- bypasses L1 since 64ch*512*512*2=32MB >> L1=256KB |
 | 3 | 41.00 | 2.561x | __ldcg reads + __stcs streaming writes (evict-first, output never re-read) |
 | 4 | 40.50 | 2.593x | __ldlu (evict-after-single-use) reads + __stcs writes -- perfect: each element read once |
+| 5 | 36.70 | 2.861x | __ldlu reads + __stwt (write-through bypass ALL caches) -- frees L2 entirely for reads |
 
 - FAIL v2 (incorrect): 1024 threads -- v[64] float needs 64 regs/thread, 1024t = 65536 regs at SM limit, register spilling causes corruption
 - FAIL v3 (44.60ms): 256 threads -- fewer warps per block, worse latency hiding

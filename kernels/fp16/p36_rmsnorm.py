@@ -7,10 +7,10 @@ cuda_source = """
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
-// v7: __ldlu (load last-use, evict immediately) for channel reads + __stcs writes.
-// Since each element is only read once (no reuse across iterations), evicting immediately
-// after use could free L2 space faster for subsequent threads' reads.
-__global__ void rmsnorm_fp16_v7(
+// v8: __ldlu reads + __stwt (write-through, bypass all caches) writes.
+// Output is written once, never re-read. Bypassing ALL caches for writes might free
+// more L2 bandwidth for the reads.
+__global__ void rmsnorm_fp16_v8(
     const __half* __restrict__ x,
     __half* __restrict__ out,
     int B, int C, int HW, float eps
@@ -36,7 +36,7 @@ __global__ void rmsnorm_fp16_v7(
     #pragma unroll
     for (int c = 0; c < 64; c++) {
         __half val = __float2half(v[c] * inv_rms);
-        __stcs(&op[c * HW], val);
+        __stwt(&op[c * HW], val);
     }
 }
 
@@ -52,7 +52,7 @@ torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps) {
     __half* op = reinterpret_cast<__half*>(out.data_ptr<at::Half>());
     int threads = 512;
     int blocks = (B * HW + threads - 1) / threads;
-    rmsnorm_fp16_v7<<<blocks, threads>>>(xp, op, B, C, HW, eps);
+    rmsnorm_fp16_v8<<<blocks, threads>>>(xp, op, B, C, HW, eps);
     return out;
 }
 """
@@ -60,7 +60,7 @@ torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps) {
 cpp_source = "torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps);"
 
 module = load_inline(
-    name='rmsnorm_fp16_v7b',
+    name='rmsnorm_fp16_v8b',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
     functions=['rmsnorm_fp16_cuda'],

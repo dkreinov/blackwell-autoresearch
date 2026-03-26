@@ -137,9 +137,9 @@
   "36": {
     "name": "RMSNorm",
     "baseline_ms": 105.0,
-    "best_ms": 40.5,
-    "best_speedup": 2.593,
-    "iterations": 4,
+    "best_ms": 36.7,
+    "best_speedup": 2.861,
+    "iterations": 5,
     "history": [
       {
         "version": 1,
@@ -164,6 +164,12 @@
         "ms": 40.5,
         "speedup": 2.593,
         "note": "__ldlu (evict-after-use) reads + __stcs writes, 512t -- best cache policy found"
+      },
+      {
+        "version": 5,
+        "ms": 36.7,
+        "speedup": 2.861,
+        "note": "__ldlu reads + __stwt (write-through bypass ALL caches) writes -- frees L2 for read-heavy pass"
       }
     ]
   },
