@@ -26,7 +26,9 @@ RESULTS_FILE = WORK / "results" / "Thor_AGX" / "activation_matrix.json"
 TEMPLATES_DIR = WORK / "templates" / "activations"
 CATEGORIES_FILE = WORK / "categories.json"
 
-SSH = "ssh -o StrictHostKeyChecking=no nvidia@nvidia-thor-01"
+THOR_HOST = os.environ.get("THOR_HOST", "nvidia-thor-01")
+THOR_USER = os.environ.get("THOR_USER", "nvidia")
+SSH = f"ssh -o StrictHostKeyChecking=no {THOR_USER}@{THOR_HOST}"
 AGENT = "bash ~/thor_kernelbench_work/thor_agent.sh"
 REMOTE_KERNELS = "~/thor_kernelbench_work/kernels"
 
@@ -65,7 +67,7 @@ def generate_kernel(template: str, pid: int, name: str, math_expr: str) -> str:
 
 def scp_to_thor(local_path: str, remote_name: str):
     """Copy a kernel file to Thor."""
-    cmd = f'scp -o StrictHostKeyChecking=no "{local_path}" nvidia@nvidia-thor-01:{REMOTE_KERNELS}/{remote_name}'
+    cmd = f'scp -o StrictHostKeyChecking=no "{local_path}" {THOR_USER}@{THOR_HOST}:{REMOTE_KERNELS}/{remote_name}'
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=15)
     if result.returncode != 0:
         raise RuntimeError(f"SCP failed: {result.stderr}")
