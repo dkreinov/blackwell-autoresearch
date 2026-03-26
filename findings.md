@@ -697,3 +697,200 @@ fp16 precision pass. Same 30 problems, half-precision. Baselines: baseline_level
 Results: kernel_results_fp16.json. Kernel files: kernels/fp16/p{pid}_{name}.py.
 Eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/fp16/p{N}_*.py --precision fp16`
 
+### p19 ReLU (fp16)
+
+fp16 baseline: 27.7ms (fp32 baseline: 57.5ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p20 LeakyReLU (fp16)
+
+fp16 baseline: 27.8ms (fp32 baseline: 56.6ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p21 Sigmoid (fp16)
+
+fp16 baseline: 27.5ms (fp32 baseline: 56.6ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p22 Tanh (fp16)
+
+fp16 baseline: 27.8ms (fp32 baseline: 56.8ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p23 Softmax (fp16)
+
+fp16 baseline: 36.1ms (fp32 baseline: 100.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p24 LogSoftmax (fp16)
+
+fp16 baseline: 32.6ms (fp32 baseline: 110.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p25 Swish (fp16)
+
+fp16 baseline: 69.0ms (fp32 baseline: 142.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+| 1 | 46.0 | 1.500x | half2 vectorized, naive loads |
+
+### p26 GELU (fp16)
+
+fp16 baseline: 27.7ms (fp32 baseline: 56.8ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p27 SELU (fp16)
+
+fp16 baseline: 27.7ms (fp32 baseline: 56.8ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p28 HardSigmoid (fp16)
+
+fp16 baseline: 27.8ms (fp32 baseline: 56.7ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p29 Softplus (fp16)
+
+fp16 baseline: 28.6ms (fp32 baseline: 56.5ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p30 Softsign (fp16)
+
+fp16 baseline: 96.9ms (fp32 baseline: 197.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p31 ELU (fp16)
+
+fp16 baseline: 27.7ms (fp32 baseline: 56.5ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p32 HardTanh (fp16)
+
+fp16 baseline: 27.7ms (fp32 baseline: 56.7ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p33 BatchNorm2d (fp16)
+
+fp16 baseline: 64.5ms (fp32 baseline: 91.5ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p34 InstanceNorm2d (fp16)
+
+fp16 baseline: 82.5ms (fp32 baseline: 135.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p36 RMSNorm (fp16)
+
+fp16 baseline: 105.0ms (fp32 baseline: 172.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p37 FrobeniusNorm (fp16)
+
+fp16 baseline: 64.4ms (fp32 baseline: 98.5ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p38 L1Norm (fp16)
+
+fp16 baseline: 117.0ms (fp32 baseline: 193.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p39 L2Norm (fp16)
+
+fp16 baseline: 80.0ms (fp32 baseline: 118.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p88 MinGPTNewGelu (fp16)
+
+fp16 baseline: 10.5ms (fp32 baseline: 19.8ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p91 CumsumReverse (fp16)
+
+fp16 baseline: 99.0ms (fp32 baseline: 110.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p92 CumsumExclusive (fp16)
+
+fp16 baseline: 102.0ms (fp32 baseline: 122.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p93 MaskedCumsum (fp16)
+
+fp16 baseline: 73.1ms (fp32 baseline: 90.5ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p94 MSELoss (fp16)
+
+fp16 baseline: 55.1ms (fp32 baseline: 103.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p96 HuberLoss (fp16)
+
+fp16 baseline: 36.9ms (fp32 baseline: 69.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p97 ScaledDotProductAttention (fp16)
+
+fp16 baseline: 52.1ms (fp32 baseline: 143.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+### p100 HingeLoss (fp16)
+
+fp16 baseline: 73.5ms (fp32 baseline: 122.0ms)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+

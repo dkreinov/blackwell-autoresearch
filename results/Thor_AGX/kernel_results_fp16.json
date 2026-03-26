@@ -1,0 +1,233 @@
+{
+  "19": {
+    "name": "ReLU",
+    "baseline_ms": 27.7,
+    "best_ms": 27.7,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "20": {
+    "name": "LeakyReLU",
+    "baseline_ms": 27.8,
+    "best_ms": 27.8,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "21": {
+    "name": "Sigmoid",
+    "baseline_ms": 27.5,
+    "best_ms": 27.5,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "22": {
+    "name": "Tanh",
+    "baseline_ms": 27.8,
+    "best_ms": 27.8,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "23": {
+    "name": "Softmax",
+    "baseline_ms": 36.1,
+    "best_ms": 36.1,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "24": {
+    "name": "LogSoftmax",
+    "baseline_ms": 32.6,
+    "best_ms": 32.6,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "25": {
+    "name": "Swish",
+    "baseline_ms": 69.0,
+    "best_ms": 46.0,
+    "best_speedup": 1.5,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 46.0,
+        "speedup": 1.5,
+        "note": "half2 vectorized, naive loads"
+      }
+    ]
+  },
+  "26": {
+    "name": "GELU",
+    "baseline_ms": 27.7,
+    "best_ms": 27.7,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "27": {
+    "name": "SELU",
+    "baseline_ms": 27.7,
+    "best_ms": 27.7,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "28": {
+    "name": "HardSigmoid",
+    "baseline_ms": 27.8,
+    "best_ms": 27.8,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "29": {
+    "name": "Softplus",
+    "baseline_ms": 28.6,
+    "best_ms": 28.6,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "30": {
+    "name": "Softsign",
+    "baseline_ms": 96.9,
+    "best_ms": 96.9,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "31": {
+    "name": "ELU",
+    "baseline_ms": 27.7,
+    "best_ms": 27.7,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "32": {
+    "name": "HardTanh",
+    "baseline_ms": 27.7,
+    "best_ms": 27.7,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "33": {
+    "name": "BatchNorm2d",
+    "baseline_ms": 64.5,
+    "best_ms": 64.5,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "34": {
+    "name": "InstanceNorm2d",
+    "baseline_ms": 82.5,
+    "best_ms": 82.5,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "36": {
+    "name": "RMSNorm",
+    "baseline_ms": 105.0,
+    "best_ms": 105.0,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "37": {
+    "name": "FrobeniusNorm",
+    "baseline_ms": 64.4,
+    "best_ms": 64.4,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "38": {
+    "name": "L1Norm",
+    "baseline_ms": 117.0,
+    "best_ms": 117.0,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "39": {
+    "name": "L2Norm",
+    "baseline_ms": 80.0,
+    "best_ms": 80.0,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "88": {
+    "name": "MinGPTNewGelu",
+    "baseline_ms": 10.5,
+    "best_ms": 10.5,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "91": {
+    "name": "CumsumReverse",
+    "baseline_ms": 99.0,
+    "best_ms": 99.0,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "92": {
+    "name": "CumsumExclusive",
+    "baseline_ms": 102.0,
+    "best_ms": 102.0,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "93": {
+    "name": "MaskedCumsum",
+    "baseline_ms": 73.1,
+    "best_ms": 73.1,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "94": {
+    "name": "MSELoss",
+    "baseline_ms": 55.1,
+    "best_ms": 55.1,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "96": {
+    "name": "HuberLoss",
+    "baseline_ms": 36.9,
+    "best_ms": 36.9,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "97": {
+    "name": "ScaledDotProductAttention",
+    "baseline_ms": 52.1,
+    "best_ms": 52.1,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "100": {
+    "name": "HingeLoss",
+    "baseline_ms": 73.5,
+    "best_ms": 73.5,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  }
+}
