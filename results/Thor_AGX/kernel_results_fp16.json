@@ -198,10 +198,17 @@
   "92": {
     "name": "CumsumExclusive",
     "baseline_ms": 102.0,
-    "best_ms": 102.0,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 85.9,
+    "best_speedup": 1.187,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 85.9,
+        "speedup": 1.187,
+        "note": "fp32 kernel transferred (pure PyTorch cumsum+shift, dtype-agnostic)"
+      }
+    ]
   },
   "93": {
     "name": "MaskedCumsum",
@@ -230,10 +237,17 @@
   "97": {
     "name": "ScaledDotProductAttention",
     "baseline_ms": 52.1,
-    "best_ms": 52.1,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 32.0,
+    "best_speedup": 1.628,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 32.0,
+        "speedup": 1.628,
+        "note": "fp32 kernel transferred (baddbmm+bmm+softmax, dtype-agnostic)"
+      }
+    ]
   },
   "100": {
     "name": "HingeLoss",
