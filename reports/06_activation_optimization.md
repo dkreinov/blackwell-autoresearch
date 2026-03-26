@@ -1,4 +1,4 @@
-# Report 06: Activation Kernel Optimization — Thor AGX (sm_110)
+# Report 06: Activation Kernel Optimization -- Thor AGX (sm_110)
 
 **13 problems, 2 optimization rounds, all at or near empirical performance floor.**
 
@@ -30,7 +30,7 @@ All measurements: MAXN power mode, 20-trial CUDA-event benchmark, sm_110 / CUDA 
 
 ```mermaid
 xychart-beta
-    title "Speedup vs PyTorch Baseline — All 13 Activations"
+    title "Speedup vs PyTorch Baseline -- All 13 Activations"
     x-axis ["p19", "p20", "p21", "p22", "p25", "p26", "p27", "p28", "p29", "p30", "p31", "p32", "p88"]
     y-axis "Speedup (x)" 1.0 --> 9.0
     bar [1.032, 1.018, 1.018, 1.022, 2.554, 1.022, 1.022, 1.020, 1.016, 3.543, 1.016, 1.020, 8.646]
@@ -43,7 +43,7 @@ Three tiers are visible:
 
 ---
 
-## Optimization 1 — Pass Fusion (p25, p30, p88)
+## Optimization 1 -- Pass Fusion (p25, p30, p88)
 
 PyTorch's eager mode evaluates intermediate tensors to DRAM and reloads them.
 A fused kernel reads each element once, computes everything, writes once.
@@ -56,15 +56,15 @@ A fused kernel reads each element once, computes everything, writes once.
 | Softsign `x / (1+\|x\|)` | ~3 | 1 | 197.0ms | 55.60ms |
 | MinGPTNewGelu `0.5x(1+tanh(...))` | ~7 | 1 | 19.8ms | 2.29ms |
 
-All three land near the same absolute time (~55.6ms for the large 4096×393216 tensor, 2.29ms for the smaller 8192×8192 tensor). The ~55.6ms value was observed consistently across 23+ experiments on p30 and 14+ on p25 with no variation improving below it — cache modifiers, occupancy changes, prefetch hints, and stride-loop variants all failed. Whether a better approach exists is unknown.
+All three land near the same absolute time (~55.6ms for the large 4096×393216 tensor, 2.29ms for the smaller 8192×8192 tensor). The ~55.6ms value was observed consistently across 23+ experiments on p30 and 14+ on p25 with no variation improving below it -- cache modifiers, occupancy changes, prefetch hints, and stride-loop variants all failed. Whether a better approach exists is unknown.
 
-### p25 Swish — Optimization Trajectory
+### p25 Swish -- Optimization Trajectory
 
 Starting from a correct fused kernel, the progression was:
 
 ```mermaid
 xychart-beta
-    title "p25 Swish — Speedup per Version"
+    title "p25 Swish -- Speedup per Version"
     x-axis ["v1 (baseline)", "v2 512t", "v3 2xf4", "v6 1024t", "v8 big grid", "v9 exact grid"]
     y-axis "Speedup (x)" 2.0 --> 2.7
     line [2.212, 2.247, 2.250, 2.363, 2.432, 2.554]
@@ -81,11 +81,11 @@ xychart-beta
 
 **Key discovery:** The grid-stride loop itself cost ~4ms. Allocating exactly `ceil(n4/1024)` blocks and removing the loop removed a significant scheduling overhead.
 
-### p88 MinGPTNewGelu — Optimization Trajectory
+### p88 MinGPTNewGelu -- Optimization Trajectory
 
 ```mermaid
 xychart-beta
-    title "p88 MinGPTNewGelu — Speedup per Version"
+    title "p88 MinGPTNewGelu -- Speedup per Version"
     x-axis ["v1 1024t", "v3 512t"]
     y-axis "Speedup (x)" 8.0 --> 9.0
     line [8.426, 8.646]
@@ -96,31 +96,31 @@ xychart-beta
 | v1 | float4, 1024 threads, exact grid, `__tanhf` | 2.35 | 8.426x |
 | **v3** | **512 threads/block (3 blocks/SM → 100% warp occupancy)** | **2.29** | **8.646x** |
 
-v1 alone captured nearly all the gain from pass fusion. The 512-thread improvement exists because the 8192×8192 tensor is ~16× smaller than the 4096×393216 tensors — with fewer blocks in flight, maximizing SM occupancy matters. For the large tensors, 1024 threads is consistently faster.
+v1 alone captured nearly all the gain from pass fusion. The 512-thread improvement exists because the 8192×8192 tensor is ~16× smaller than the 4096×393216 tensors -- with fewer blocks in flight, maximizing SM occupancy matters. For the large tensors, 1024 threads is consistently faster.
 
 ---
 
-## Optimization 2 — float4 Vectorization (p19–p32 group)
+## Optimization 2 -- float4 Vectorization (p19–p32 group)
 
 Single-pass activations (ReLU, Sigmoid, Tanh, etc.) have almost no room for pass fusion. The gain comes from replacing PyTorch's scalar kernel launch with a 128-bit vectorized load/store:
 
 - **float4**: 4 floats per load instruction, 1 coalesced 128-bit memory transaction per thread
-- **Exact grid** (no stride loop): same discovery as p25 — removing the loop saves overhead
+- **Exact grid** (no stride loop): same discovery as p25 -- removing the loop saves overhead
 
 Most hit 55.60ms on the first attempt. Those that started at 55.70ms needed one additional tweak:
 
 | Problem | First attempt | Tweak | Final |
 |---------|--------------|-------|-------|
-| GELU (p26) | 55.70ms (erff) | Switch to tanh approx (`__tanhf`) — no `__erff` intrinsic | 55.60ms |
+| GELU (p26) | 55.70ms (erff) | Switch to tanh approx (`__tanhf`) -- no `__erff` intrinsic | 55.60ms |
 | SELU (p27) | 55.70ms | Precompute `scale×alpha` constant, save 1 multiply | 55.60ms |
 | HardSigmoid (p28) | 55.70ms | `fmaf(x, 1/6, 0.5)` instead of `(x+3)/6`, save 1 add | 55.60ms |
-| Softplus (p29) | 56.30ms (`log1pf`) | Switch to `__logf(1+__expf(x))` — `log1pf` has wrapper overhead on sm_110 | 55.60ms |
+| Softplus (p29) | 56.30ms (`log1pf`) | Switch to `__logf(1+__expf(x))` -- `log1pf` has wrapper overhead on sm_110 | 55.60ms |
 
 **Notable:** `__logf` vs `log1pf` saved 0.7ms on Softplus. Both should call the same hardware instruction under `--use_fast_math`, but the wrapper adds overhead on sm_110 / CUDA 13.0.
 
 ---
 
-## Optimization 3 — Thread Config for Small vs Large Tensors
+## Optimization 3 -- Thread Config for Small vs Large Tensors
 
 | Tensor | Size | Optimal threads/block | Reason |
 |--------|------|-----------------------|--------|
@@ -139,8 +139,8 @@ Across 50+ failed experiments:
 
 - **Cache modifiers** (`.cs`, `.cg`, `.wt`, `.nc`, L2::256B): no improvement. Hardware prefetch already handles sequential access.
 - **Software prefetch** (`prefetch.global.L2`, `cp.async`): no improvement; `cp.async` caused a compile error.
-- **L2 access policy** (`cudaStreamAttrValue`): produces **incorrect results** on Thor ATS — do not use.
-- **half2 division** (`__h2div`): **incorrect results** on sm_110 — do not use.
+- **L2 access policy** (`cudaStreamAttrValue`): produces **incorrect results** on Thor ATS -- do not use.
+- **half2 division** (`__h2div`): **incorrect results** on sm_110 -- do not use.
 - **Multiple CUDA streams**: single GPU serializes them, no gain.
 - **2×/4× float4 per thread**: slower or same; register pressure at high occupancy hurts.
 - **Stride loops with large grid**: always slower than exact grid.

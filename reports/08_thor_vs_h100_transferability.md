@@ -1,4 +1,4 @@
-# Report 08: Thor vs H100 — Kernel Transferability Analysis
+# Report 08: Thor vs H100 -- Kernel Transferability Analysis
 
 **Which optimizations are platform-specific to Thor/Blackwell, and which are universal?**
 
@@ -42,7 +42,7 @@ Problems where both H100 (Sakana) and Thor (our) results exist.
 | 39 | L2Norm | 1.89x | 2.04x | 1.33x | Sakana | Two-pass with higher unroll |
 | 88 | MinGPTNewGelu | 5.72x | 6.00x | **8.65x** | Ours | 100% warp occupancy (512t) key |
 | 91 | CumsumReverse | 1.01x | 1.03x | **2.89x** | Ours | H100 approach gets no benefit |
-| 94 | MSELoss | 1.03x | 0.35x | **2.73x** | Ours | **SMOKING GUN — see below** |
+| 94 | MSELoss | 1.03x | 0.35x | **2.73x** | Ours | **SMOKING GUN -- see below** |
 | 96 | HuberLoss | 1.62x | 1.86x | 1.90x | ~Tie | Same fused-reduce pattern |
 | 100 | HingeLoss | 1.85x | incorrect | **6.32x** | Ours | Sakana kernel incorrect on Thor |
 
@@ -52,7 +52,7 @@ Sakana `thor_speedup` = ref\_time\_ms / custom\_time\_ms measured on Thor with K
 
 ## Category Analysis
 
-### Category A: Universal — Transfer with No Tuning Required
+### Category A: Universal -- Transfer with No Tuning Required
 
 **Pass fusion** (compute + reduction in one kernel) works identically on both platforms. The gain comes from eliminating intermediate tensor writes to DRAM, which is costly on both HBM and LPDDR5X.
 
@@ -65,7 +65,7 @@ Sakana `thor_speedup` = ref\_time\_ms / custom\_time\_ms measured on Thor with K
 
 **float4 vectorization** (4 elements per load/store instruction) gives a consistent 15–20% over scalar in bandwidth-bound kernels. Every Sakana activation kernel that compiled on Thor used float4 and showed a modest speedup.
 
-### Category B: Thor-Aware — Same Technique, Different Parameters
+### Category B: Thor-Aware -- Same Technique, Different Parameters
 
 **L2 cache reuse** is available on both platforms, but the working set boundary differs. Thor has 32MB L2; H100 has 50MB. Kernels tuned for H100's larger L2 (e.g., larger thread counts, bigger tile sizes) can exceed Thor's L2 capacity and lose the reuse benefit.
 
@@ -80,15 +80,15 @@ The 1024t configuration was discovered through benchmarking on Thor specifically
 
 **TF32 Tensor Cores** via raw `torch.bmm` work identically on both platforms. PyTorch SDPA ignores `allow_tf32` on both H100 and Thor. This is a PyTorch-level bypass, not architecture-specific.
 
-### Category C: Thor-Specific — H100 Approach Actively Harmful
+### Category C: Thor-Specific -- H100 Approach Actively Harmful
 
 **MSELoss: Platform-Specific Regression (H100=1.03x → Thor=0.35x)**
 
 Sakana's H100 MSELoss kernel: 3x SLOWER than PyTorch baseline on Thor. Our Thor kernel: 2.73x faster.
 
 Root cause: H100 kernels for reductions typically stage partial sums in shared memory before reducing across warps. This pattern is tuned for H100's HBM bandwidth (2 TB/s) and large SM count (132 SMs). On Thor:
-- 20 SMs vs 132 on H100 — fewer parallel reduction trees
-- LPDDR5X at 273 GB/s vs 2 TB/s HBM — bandwidth is the ceiling, not latency
+- 20 SMs vs 132 on H100 -- fewer parallel reduction trees
+- LPDDR5X at 273 GB/s vs 2 TB/s HBM -- bandwidth is the ceiling, not latency
 - Shared-memory staging adds synchronization overhead that outweighs the benefit
 
 Our approach: direct `float4` global loads → warp reduce → `atomicAdd` to partial sum. No shared-memory staging. Simple pipeline saturates LPDDR5X bandwidth.
@@ -97,27 +97,27 @@ Our approach: direct `float4` global loads → warp reduce → `atomicAdd` to pa
 
 The H100 cumsum_reverse kernel essentially matches PyTorch on both platforms (1.01x H100, 1.03x Thor). PyTorch's implementation is already flip+cumsum+flip, and the H100 kernel does something similar.
 
-Our Thor kernel eliminates all three passes with a direct right-to-left tile scan. The gain is not from shared-memory optimization — it is from algorithmic pass elimination. This is not a H100-specific insight; the algorithm is universal. But it was only discovered through working from scratch on Thor rather than porting an H100 kernel.
+Our Thor kernel eliminates all three passes with a direct right-to-left tile scan. The gain is not from shared-memory optimization -- it is from algorithmic pass elimination. This is not a H100-specific insight; the algorithm is universal. But it was only discovered through working from scratch on Thor rather than porting an H100 kernel.
 
 **Softsign (H100=2.47x → Thor=1.78x → Ours=3.54x)**
 
-Sakana's Softsign kernel achieves 1.78x on Thor vs 2.47x on H100 — a 28% degradation. The H100 kernel likely uses multi-element-per-thread patterns optimized for H100's wider memory bus. Our Thor kernel uses exactly-sized grid (no stride loop) which matters more on Thor where scheduling overhead is proportionally larger with fewer SMs.
+Sakana's Softsign kernel achieves 1.78x on Thor vs 2.47x on H100 -- a 28% degradation. The H100 kernel likely uses multi-element-per-thread patterns optimized for H100's wider memory bus. Our Thor kernel uses exactly-sized grid (no stride loop) which matters more on Thor where scheduling overhead is proportionally larger with fewer SMs.
 
 ---
 
-## The Sakana Transfer Study — What Compiled and What Ran
+## The Sakana Transfer Study -- What Compiled and What Ran
 
 Of 63 Sakana kernels tested:
 
 | Status | Count | Primary cause |
 |--------|-------|---------------|
-| Compiled, correct, faster | 23 | — |
+| Compiled, correct, faster | 23 | -- |
 | Compiled, correct, slower | 4 | H100-tuned shared-mem patterns |
 | Compiled, incorrect | 5 | Shared-memory race or dtype assumption |
 | Failed to compile | 16 | C++ API mismatch (`Cannot determine CUDA forward args`) |
 | Build error (nvcc) | 15 | sm_110 PTX syntax not supported |
 
-The `TypeError: Cannot determine CUDA forward args` failure affected all pooling, convolution, and most normalization kernels — these use non-standard forward() signatures that the Sakana evaluation harness could not introspect. It is a tooling failure, not an architectural incompatibility.
+The `TypeError: Cannot determine CUDA forward args` failure affected all pooling, convolution, and most normalization kernels -- these use non-standard forward() signatures that the Sakana evaluation harness could not introspect. It is a tooling failure, not an architectural incompatibility.
 
 The 15 nvcc build errors are genuine sm_110 issues: Sakana kernels that use PTX intrinsics or inline assembly targeting sm_80/sm_89 fail to assemble for sm_110.
 
@@ -126,20 +126,20 @@ The 15 nvcc build errors are genuine sm_110 issues: Sakana kernels that use PTX 
 ## Implications for Kernel Portability
 
 **What transfers from H100 to Thor without changes:**
-- Pass fusion (multi-op → single kernel) — architecture-agnostic
-- float4 vectorization — works on any GPU with 128-bit load/store
-- TF32 Tensor Core bypass (`bmm` instead of `sdpa`) — PyTorch-level behavior, not arch-specific
-- Warp-level reductions (`__shfl_xor_sync`) — available on all modern CUDA GPUs
+- Pass fusion (multi-op → single kernel) -- architecture-agnostic
+- float4 vectorization -- works on any GPU with 128-bit load/store
+- TF32 Tensor Core bypass (`bmm` instead of `sdpa`) -- PyTorch-level behavior, not arch-specific
+- Warp-level reductions (`__shfl_xor_sync`) -- available on all modern CUDA GPUs
 
 **What requires Thor-specific tuning:**
-- Thread counts — fewer SMs means occupancy curves differ; 1024t is often optimal on Thor where 512t is on H100
-- L2 reuse working sets — Thor's 32MB L2 vs H100's 50MB sets different tiling limits
-- Exact grid sizing — scheduling overhead is larger per SM on Thor; no-stride exact grids beat stride loops
-- Block counts for reductions — H100 reduction kernels use many blocks for SM-level parallelism; Thor needs fewer to avoid atomicAdd contention
+- Thread counts -- fewer SMs means occupancy curves differ; 1024t is often optimal on Thor where 512t is on H100
+- L2 reuse working sets -- Thor's 32MB L2 vs H100's 50MB sets different tiling limits
+- Exact grid sizing -- scheduling overhead is larger per SM on Thor; no-stride exact grids beat stride loops
+- Block counts for reductions -- H100 reduction kernels use many blocks for SM-level parallelism; Thor needs fewer to avoid atomicAdd contention
 
 **What requires a different algorithm entirely:**
-- Reductions with shared-memory staging — LPDDR5X bandwidth ceiling makes staging overhead dominant
-- Any kernel using sm_80/sm_89 PTX intrinsics — rewrite required for sm_110
+- Reductions with shared-memory staging -- LPDDR5X bandwidth ceiling makes staging overhead dominant
+- Any kernel using sm_80/sm_89 PTX intrinsics -- rewrite required for sm_110
 
 ---
 

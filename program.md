@@ -6,8 +6,8 @@ Optimize CUDA kernels from KernelBench Level 1 on NVIDIA Jetson AGX Thor (Blackw
 
 - **Primary metric**: speedup vs PyTorch baseline (higher = better)
 - **Evaluation**: compile with nvcc (sm_110), test correctness (3 trials), benchmark (20 trials, cuda_event)
-- **Current category**: HEAVY KERNELS (norms, losses, softmax, scans — see schedule.json)
-- **Iteration**: per-kernel optimization via `eval_kernel.py` — one problem at a time, round-robin schedule
+- **Current category**: HEAVY KERNELS (norms, losses, softmax, scans -- see schedule.json)
+- **Iteration**: per-kernel optimization via `eval_kernel.py` -- one problem at a time, round-robin schedule
 - **One kernel per experiment**: each KernelBench problem has one PyTorch Model → write one optimized CUDA replacement (ModelNew)
 
 ### Autonomy
@@ -100,7 +100,7 @@ Run experiments continuously until externally interrupted. Do not pause for conf
 
 ## 3. Compilation
 
-- Target: `TORCH_CUDA_ARCH_LIST=11.0` (NOT "Blackwell" — that maps to sm_100/120, not sm_110)
+- Target: `TORCH_CUDA_ARCH_LIST=11.0` (NOT "Blackwell" -- that maps to sm_100/120, not sm_110)
 - Flags: `-O3 --use_fast_math`
 - Build: `torch.utils.cpp_extension.load_inline()`
 - Correctness tolerance: atol=1e-2, rtol=1e-2
@@ -140,12 +140,12 @@ Source of truth: `results/Thor_AGX/kernel_results.json` (per-problem best speedu
 
 ### Files
 
-- `kernels/p{pid}_{name}.py` — current best kernel (evolves in place, git tracks history)
-- `kernels/p{pid}_{name}_candidate.py` — temporary candidate being tested (MUST be deleted after each test)
-- `scripts/eval_kernel.py` — single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{N}_*.py`
-- `results/Thor_AGX/kernel_results.json` — per-problem best speedup + version history
-- `findings.md` — per-problem experiment results and failures
-- `schedule.json` — round-robin order and timing config
+- `kernels/p{pid}_{name}.py` -- current best kernel (evolves in place, git tracks history)
+- `kernels/p{pid}_{name}_candidate.py` -- temporary candidate being tested (MUST be deleted after each test)
+- `scripts/eval_kernel.py` -- single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{N}_*.py`
+- `results/Thor_AGX/kernel_results.json` -- per-problem best speedup + version history
+- `findings.md` -- per-problem experiment results and failures
+- `schedule.json` -- round-robin order and timing config
 
 ### Loop (run autonomously, do not pause)
 
@@ -154,9 +154,9 @@ Max 2 minutes per experiment (eval times out at 120s).
 
 **Per-experiment cycle** (repeat until 1hr on current problem, then advance schedule):
 
-1. Read `findings.md` section for current problem — what has been tried, what failed
-2. Read `results/Thor_AGX/kernel_results.json` — current best speedup for this problem
-3. Read current kernel file `kernels/p{pid}_{name}.py` — the code to improve
+1. Read `findings.md` section for current problem -- what has been tried, what failed
+2. Read `results/Thor_AGX/kernel_results.json` -- current best speedup for this problem
+3. Read current kernel file `kernels/p{pid}_{name}.py` -- the code to improve
 4. Invent ONE targeted change based on:
    - Thor hardware specs (Section 2)
    - What failed before (findings.md for this problem)
@@ -171,7 +171,7 @@ Max 2 minutes per experiment (eval times out at 120s).
    - Update `findings.md` section: add row to table, note what worked
    - **Commit and push immediately**:
      `git add kernels/p{pid}_{name}.py results/Thor_AGX/kernel_results.json findings.md`
-     `git commit -m "p{pid}: {name} v{N} — <change>, {old}x -> {new}x"`
+     `git commit -m "p{pid}: {name} v{N} -- <change>, {old}x -> {new}x"`
      `git push origin main`
 8. **If result is slower, incorrect, or times out**:
    - **Delete the candidate file immediately**
@@ -196,7 +196,7 @@ Max 2 minutes per experiment (eval times out at 120s).
 ### Commit Format
 
 ```
-p{pid}: {name} v{N} — {one-line change description}, {old_speedup}x -> {new_speedup}x
+p{pid}: {name} v{N} -- {one-line change description}, {old_speedup}x -> {new_speedup}x
 ```
 
 Only commit improvements. Discards are noted in findings.md but not committed.
@@ -220,9 +220,9 @@ Only commit improvements. Discards are noted in findings.md but not committed.
 - Overwrite a kernel file unless the new version is strictly better (correct + faster)
 
 ### Anti-Paralysis Rules
-1. First tool call within first response — no multi-paragraph analysis before acting
-2. No cycle estimation in prose — the benchmark is the oracle
-3. One response = one action — every response must contain a tool call
+1. First tool call within first response -- no multi-paragraph analysis before acting
+2. No cycle estimation in prose -- the benchmark is the oracle
+3. One response = one action -- every response must contain a tool call
 4. If resuming from context summary: read kernel_results.json + schedule.json, pick current problem, execute immediately
 
 ---
@@ -232,7 +232,7 @@ Only commit improvements. Discards are noted in findings.md but not committed.
 After each experiment (one problem, one change):
 
 ```
-=== p{pid} {name} — attempt {N} ===
+=== p{pid} {name} -- attempt {N} ===
 Idea: <one-line description of the change>
 Result: OK {ms}ms {speedup}x | FAIL {reason}
 vs current best: {old_speedup}x -> {new_speedup}x (+{pct}%) | no improvement

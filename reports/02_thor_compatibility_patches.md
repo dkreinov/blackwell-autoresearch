@@ -1,4 +1,4 @@
-# KernelBench on Jetson AGX Thor — Compatibility Patches
+# KernelBench on Jetson AGX Thor -- Compatibility Patches
 
 **Date:** 2026-03-18
 **Host:** nvidia-thor-01
@@ -15,7 +15,7 @@ KernelBench required **two categories of changes** to run on Jetson AGX Thor (Bl
 ## Patch 1: Relax Python version pin
 
 **File:** `pyproject.toml` line 10
-**Reason:** KernelBench pins `requires-python = "==3.10.*"` but the Jetson AGX Thor ships with Python 3.12.3 (Ubuntu 24.04). No Python 3.10 is available in the system repos. The codebase uses no 3.10-specific syntax — the pin is conservative.
+**Reason:** KernelBench pins `requires-python = "==3.10.*"` but the Jetson AGX Thor ships with Python 3.12.3 (Ubuntu 24.04). No Python 3.10 is available in the system repos. The codebase uses no 3.10-specific syntax -- the pin is conservative.
 
 ```diff
 diff --git a/pyproject.toml b/pyproject.toml
@@ -39,7 +39,7 @@ index f3f98ae..7aaff44 100644
 
 ## Patch 2 (runtime, not code): Use torch cu130 instead of cu126
 
-**Not a code change** — this is a wheel selection decision at install time.
+**Not a code change** -- this is a wheel selection decision at install time.
 
 **Reason:** The default PyTorch cu126 wheel (`torch==2.9.1+cu126`) only includes compiled kernels for sm_80–sm_90. Thor's sm_110 (Blackwell) is not in that set, producing:
 

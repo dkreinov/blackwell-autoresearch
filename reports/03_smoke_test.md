@@ -1,4 +1,4 @@
-# KernelBench on Jetson AGX Thor — Smoke Test Results
+# KernelBench on Jetson AGX Thor -- Smoke Test Results
 
 **Date:** 2026-03-18
 **Host:** nvidia-thor-01
@@ -26,7 +26,7 @@ print(y.shape)  # torch.Size([4, 4])
 "
 ```
 
-**Result:** PASS — no warnings, no errors, GPU matmul functional.
+**Result:** PASS -- no warnings, no errors, GPU matmul functional.
 
 ---
 
@@ -64,11 +64,11 @@ Using PyTorch Eager Execution on softmax
  'hardware': 'NVIDIA Thor', 'device': 'cuda:0'}
 ```
 
-**Result:** PASS — softmax (batch=4096, dim=65536), mean 10.2ms
+**Result:** PASS -- softmax (batch=4096, dim=65536), mean 10.2ms
 
 ---
 
-## Test 4: Full dataset pipeline — Level 1, Problem 1
+## Test 4: Full dataset pipeline -- Level 1, Problem 1
 
 ```bash
 ~/thor_kernelbench_work/venv/bin/python3 -c "
@@ -98,13 +98,13 @@ Result: {'mean': 22.3, 'std': 0.020, 'min': 22.2, 'max': 22.3, 'num_trials': 100
          'hardware': 'NVIDIA Thor', 'device': 'cuda:0'}
 ```
 
-**Result:** PASS — 4096×4096 square matmul, mean 22.3ms, extremely low variance (std=0.020ms)
+**Result:** PASS -- 4096×4096 square matmul, mean 22.3ms, extremely low variance (std=0.020ms)
 
 ---
 
 ## Test 5: LLM generate-and-eval
 
-**Result:** NOT TESTED — no API keys configured on Thor (no `.env` file). This only affects the LLM generation path; the eval/timing pipeline is proven functional.
+**Result:** NOT TESTED -- no API keys configured on Thor (no `.env` file). This only affects the LLM generation path; the eval/timing pipeline is proven functional.
 
 ---
 
@@ -138,7 +138,7 @@ Notable: The matmul has remarkably low timing variance (std/mean = 0.09%), likel
 | No API keys for LLM generation | Medium | Configure `.env` with at least one provider key |
 | `modal` not installed | Low | Only needed for cloud eval, not local |
 | `cupy-cuda12x` incompatible | Low | Only for `[gpu]` extras profiling |
-| Full baseline timing (250 problems) | None — ready | `generate_baseline_time.py` needs minor adaptation (has `input()` prompts) |
+| Full baseline timing (250 problems) | None -- ready | `generate_baseline_time.py` needs minor adaptation (has `input()` prompts) |
 
 ---
 

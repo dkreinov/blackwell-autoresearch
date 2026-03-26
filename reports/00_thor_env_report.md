@@ -2,7 +2,7 @@
 
 ---
 
-## 1. GPU — nvidia-smi
+## 1. GPU -- nvidia-smi
 
 ```
 NVIDIA-SMI 580.00 | Driver Version: 580.00 | CUDA Version: 13.0
@@ -11,20 +11,20 @@ GPU 0: NVIDIA Thor
   Architecture:       Blackwell
   Compute Capability: 11.0
   Persistence Mode:   Enabled
-  Addressing Mode:    ATS (unified/shared memory — Tegra SoC, no dedicated VRAM)
+  Addressing Mode:    ATS (unified/shared memory -- Tegra SoC, no dedicated VRAM)
   Temperature:        34C
-  Memory Total:       N/A (unified memory, shared with CPU — no dedicated VRAM)
+  Memory Total:       N/A (unified memory, shared with CPU -- no dedicated VRAM)
   Current Processes:  Xorg (48 MiB), gnome-shell (25 MiB)
 ```
 
 ---
 
-## 2. CUDA Compiler — nvcc
+## 2. CUDA Compiler -- nvcc
 
 | Item | Value |
 |------|-------|
 | Path | `/usr/local/cuda-13.0/bin/nvcc` |
-| In default PATH | No — must add manually |
+| In default PATH | No -- must add manually |
 | Version | CUDA 13.0.48 (built Wed Jul 16 2025) |
 | Full toolkit installed | Yes, via apt (`cuda-*-13-0` packages) |
 
@@ -78,8 +78,8 @@ A Tegra/ARM64 CUDA-enabled PyTorch wheel must be installed for GPU workloads.
 | Docker version | 28.2.2 (linux/arm64) |
 | nvidia-container-toolkit | 1.18.1-1 installed |
 | libnvidia-container1 | 1.18.1-1 installed |
-| Docker daemon.json | NOT found — nvidia runtime not configured |
-| User docker access | DENIED — nvidia not in docker group |
+| Docker daemon.json | NOT found -- nvidia runtime not configured |
+| User docker access | DENIED -- nvidia not in docker group |
 | NVIDIA images pulled | None |
 
 **To enable NVIDIA Docker runtime:**
@@ -139,8 +139,8 @@ Note: `curl` is not installed on this system; tested via `wget`.
 |------|--------|
 | GPU detected | NVIDIA Thor (Blackwell, sm_110, compute cap 11.0) |
 | CUDA 13.0 toolkit | Installed at /usr/local/cuda-13.0 |
-| nvcc in PATH | No — add /usr/local/cuda-13.0/bin to PATH |
-| PyTorch with CUDA | NOT AVAILABLE — CPU-only builds only |
+| nvcc in PATH | No -- add /usr/local/cuda-13.0/bin to PATH |
+| PyTorch with CUDA | NOT AVAILABLE -- CPU-only builds only |
 | TensorRT | 10.13.3.9 installed (system pip) |
 | Docker + nvidia-ctk | Installed but not configured |
 | Internet | github.com and pypi.org reachable |

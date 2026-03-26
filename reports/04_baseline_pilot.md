@@ -1,4 +1,4 @@
-# KernelBench Baseline Pilot — NVIDIA Thor AGX
+# KernelBench Baseline Pilot -- NVIDIA Thor AGX
 
 **Date:** 2026-03-18
 **Hardware:** Thor_AGX (NVIDIA Thor, Blackwell sm_110, compute cap 11.0, aarch64)
@@ -6,7 +6,7 @@
 **Scope:** Level 1 (single-kernel operators), all 100 problems
 **Precision:** fp32
 **Timing:** cuda_event, 5 warmup + 100 trials per problem
-**Power mode:** MAXN (mode 0) — all clocks locked at maximum
+**Power mode:** MAXN (mode 0) -- all clocks locked at maximum
 
 ---
 
@@ -21,11 +21,11 @@
 
 | Sensor | Value |
 |--------|-------|
-| Power mode | MAXN (ID=0) — all cores online, no GPU power gating, no freq caps |
+| Power mode | MAXN (ID=0) -- all cores online, no GPU power gating, no freq caps |
 | GPU temperature | 34.5 C (idle) |
 | CPU temperature | 33.7 C (idle) |
 | Idle power (VIN) | ~26W |
-| GPU power gating mask | 64 (minimal — all compute partitions active) |
+| GPU power gating mask | 64 (minimal -- all compute partitions active) |
 
 ### Available Power Modes on Thor
 
@@ -67,9 +67,9 @@ This is the first known KernelBench baseline run on a Jetson/Tegra SoC with Blac
 
 | # | Problem | Status | Root Cause |
 |---|---------|--------|------------|
-| 95 | `95_CrossEntropyLoss.py` | error | `nll_loss_forward_reduce_cuda_kernel_2d_index` not implemented for `Float` on sm_110. This is a PyTorch CUDA kernel dispatch issue — the nll_loss kernel was not compiled for Blackwell in torch 2.9.1+cu130. Likely fixed in newer PyTorch versions. |
+| 95 | `95_CrossEntropyLoss.py` | error | `nll_loss_forward_reduce_cuda_kernel_2d_index` not implemented for `Float` on sm_110. This is a PyTorch CUDA kernel dispatch issue -- the nll_loss kernel was not compiled for Blackwell in torch 2.9.1+cu130. Likely fixed in newer PyTorch versions. |
 
-**No timeouts. No OOMs.** Thor's unified memory architecture (ATS) eliminates traditional GPU OOM scenarios — memory is shared with the 124GB system pool.
+**No timeouts. No OOMs.** Thor's unified memory architecture (ATS) eliminates traditional GPU OOM scenarios -- memory is shared with the 124GB system pool.
 
 ---
 
@@ -127,11 +127,11 @@ This is the first known KernelBench baseline run on a Jetson/Tegra SoC with Blac
 
 ### Observations
 
-1. **Matmul is fastest** (median 22.8ms) — Blackwell's tensor cores are well-utilized via cuBLAS.
+1. **Matmul is fastest** (median 22.8ms) -- Blackwell's tensor cores are well-utilized via cuBLAS.
 2. **Convolutions are efficient** (median 29.6ms) but have the widest range (8.3–181ms), reflecting large shape diversity.
-3. **Normalization is slowest** (median 112.5ms) — multiple reduction passes + element-wise ops create memory bandwidth pressure on unified memory.
+3. **Normalization is slowest** (median 112.5ms) -- multiple reduction passes + element-wise ops create memory bandwidth pressure on unified memory.
 4. **Activations cluster at ~57ms** for large-tensor elementwise ops (16M elements), suggesting memory-bandwidth-bound behavior on the unified memory bus.
-5. **No OOMs** — Thor's unified memory architecture handles all problem sizes without issue.
+5. **No OOMs** -- Thor's unified memory architecture handles all problem sizes without issue.
 
 ---
 
@@ -139,9 +139,9 @@ This is the first known KernelBench baseline run on a Jetson/Tegra SoC with Blac
 
 ### Unified Memory (ATS)
 Thor uses Address Translation Services for CPU-GPU unified memory. Implications:
-- **No OOMs** in the traditional sense — GPU shares the full system memory pool
-- **No PCIe transfer overhead** — data doesn't need to be copied between host and device
-- **Very low timing variance** — several problems show sub-0.1ms std deviation
+- **No OOMs** in the traditional sense -- GPU shares the full system memory pool
+- **No PCIe transfer overhead** -- data doesn't need to be copied between host and device
+- **Very low timing variance** -- several problems show sub-0.1ms std deviation
 - **Memory bandwidth** may be lower than discrete GPUs (no dedicated HBM), affecting memory-bound kernels
 
 ### Timing Stability
@@ -176,9 +176,9 @@ A direct comparison is not yet available but would be valuable for understanding
 
 ## Recommended Next Steps
 
-1. **Level 2 pilot** — Run Level 2 (fusion patterns, 100 problems) to test more complex operator combinations
-2. **Level 3 pilot** — Run Level 3 (full architectures, 50 problems) — may stress unified memory more
-3. **torch.compile baselines** — Run with Inductor backend to compare eager vs compiled performance
-4. **H100 comparison** — Download H100 baselines from `results/timing/` and produce a comparison table
-5. **Fix CrossEntropyLoss** — Test with bf16 precision or newer PyTorch (2.10.0+cu130) to see if #95 resolves
-6. **Publish** — This data is sufficient for a blog post: "First KernelBench Results on Jetson AGX Thor"
+1. **Level 2 pilot** -- Run Level 2 (fusion patterns, 100 problems) to test more complex operator combinations
+2. **Level 3 pilot** -- Run Level 3 (full architectures, 50 problems) -- may stress unified memory more
+3. **torch.compile baselines** -- Run with Inductor backend to compare eager vs compiled performance
+4. **H100 comparison** -- Download H100 baselines from `results/timing/` and produce a comparison table
+5. **Fix CrossEntropyLoss** -- Test with bf16 precision or newer PyTorch (2.10.0+cu130) to see if #95 resolves
+6. **Publish** -- This data is sufficient for a blog post: "First KernelBench Results on Jetson AGX Thor"

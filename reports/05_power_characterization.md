@@ -1,4 +1,4 @@
-# KernelBench Power & Clock Characterization — NVIDIA Thor AGX
+# KernelBench Power & Clock Characterization -- NVIDIA Thor AGX
 
 **Date:** 2026-03-19
 **Hardware:** Thor_AGX (NVIDIA Thor, Blackwell sm_110, compute cap 11.0, aarch64)
@@ -45,7 +45,7 @@ Two of four power modes (90W and 70W) require a full system reboot to activate t
 
 | Metric | MAXN | 120W | Delta |
 |--------|------|------|-------|
-| Problems completed | 99/100 | 99/100 | — |
+| Problems completed | 99/100 | 99/100 | -- |
 | Wall time (s) | 920.9 | 948.6 | +3.0% |
 | Timing: min (ms) | 0.73 | 0.74 | +1.4% |
 | Timing: median (ms) | 51.50 | 54.90 | +6.6% |
@@ -77,8 +77,8 @@ All power values are from tegrastats averages over the full benchmark run.
 |--------|-----------|----------|-----------|----------|
 | GPU (°C) | 50.6 | 66.6 | 48.6 | 63.2 |
 | CPU (°C) | 48.8 | 57.8 | 47.1 | 55.7 |
-| TJ (junction, °C) | — | — | 48.9 | 63.1 |
-| SoC 0-2 (°C) | — | — | 45.6 | 54.0 |
+| TJ (junction, °C) | -- | -- | 48.9 | 63.1 |
+| SoC 0-2 (°C) | -- | -- | 45.6 | 54.0 |
 
 Both modes remained well within thermal limits (throttle threshold ~90°C). The 120W mode ran ~2°C cooler on average.
 
@@ -113,10 +113,10 @@ Using GPU power as the denominator (most relevant for compute workload character
 
 ### Key Category Observations
 
-1. **Compute-bound (matmul, attention) show the largest slowdown** (+12-13%) — these are directly limited by FLOP throughput, which scales with GPU clock.
-2. **Memory-bandwidth-bound (activation, reduction, softmax) are clock-insensitive** — running at essentially the same speed because the bottleneck is memory access latency, not compute. Thor's unified memory bus is shared between modes.
-3. **Normalization is barely affected** (+2.2%) — mostly bandwidth-bound with reductions over small tensors.
-4. **Convolutions sit in the middle** (+10.6%) — a mix of GEMM-based (clock-sensitive) and bandwidth-sensitive operations.
+1. **Compute-bound (matmul, attention) show the largest slowdown** (+12-13%) -- these are directly limited by FLOP throughput, which scales with GPU clock.
+2. **Memory-bandwidth-bound (activation, reduction, softmax) are clock-insensitive** -- running at essentially the same speed because the bottleneck is memory access latency, not compute. Thor's unified memory bus is shared between modes.
+3. **Normalization is barely affected** (+2.2%) -- mostly bandwidth-bound with reductions over small tensors.
+4. **Convolutions sit in the middle** (+10.6%) -- a mix of GEMM-based (clock-sensitive) and bandwidth-sensitive operations.
 
 ---
 
@@ -130,7 +130,7 @@ NVPM ERROR: bad input!
 NVPM ERROR: optMask is 1, no request for power mode
 ```
 
-Mode 2 and Mode 3 both use GPU power-gating mask 15873 (vs 64 for MAXN/120W), which requires disabling GPU compute partitions — a hardware-level change that can only take effect at boot. The same applies to the CPU core count reduction (14→12 cores).
+Mode 2 and Mode 3 both use GPU power-gating mask 15873 (vs 64 for MAXN/120W), which requires disabling GPU compute partitions -- a hardware-level change that can only take effect at boot. The same applies to the CPU core count reduction (14→12 cores).
 
 ### Estimated Mode 2 (90W) Characteristics
 
@@ -160,13 +160,13 @@ Problem 95 (CrossEntropyLoss) failed in both measured modes:
 
 ## Recommendations
 
-1. **Use 120W mode for extended benchmarking** — 2.9% better performance-per-watt, 2°C cooler, minimal throughput loss. For workloads that are not compute-bound (most of Level 1), the difference is negligible.
+1. **Use 120W mode for extended benchmarking** -- 2.9% better performance-per-watt, 2°C cooler, minimal throughput loss. For workloads that are not compute-bound (most of Level 1), the difference is negligible.
 
-2. **MAXN for latency-critical compute-bound workloads** — Matmul, attention, convolution where every ms counts.
+2. **MAXN for latency-critical compute-bound workloads** -- Matmul, attention, convolution where every ms counts.
 
-3. **Test modes 2/3 with a dedicated reboot sequence** — Boot into mode 2, run benchmark, reboot into mode 3, run benchmark, reboot into MAXN. This can be automated via `cron` or a post-boot script.
+3. **Test modes 2/3 with a dedicated reboot sequence** -- Boot into mode 2, run benchmark, reboot into mode 3, run benchmark, reboot into MAXN. This can be automated via `cron` or a post-boot script.
 
-4. **GPU clock sweep within MAXN** — Since modes 2/3 require reboots, a more practical sweep is: set GPU min/max via sysfs (`/sys/class/devfreq/gpu-gpc-0/{min,max}_freq`) to lock specific clock points (25%, 50%, 75%, 100%) while staying in MAXN. This gives clean clock-vs-performance data without reboots.
+4. **GPU clock sweep within MAXN** -- Since modes 2/3 require reboots, a more practical sweep is: set GPU min/max via sysfs (`/sys/class/devfreq/gpu-gpc-0/{min,max}_freq`) to lock specific clock points (25%, 50%, 75%, 100%) while staying in MAXN. This gives clean clock-vs-performance data without reboots.
 
 ---
 
@@ -185,7 +185,7 @@ Problem 95 (CrossEntropyLoss) failed in both measured modes:
 
 ## Methodology Notes
 
-- **Script:** `run_power_sweep.py` — sets mode, locks clocks, waits 60s thermal settle, starts tegrastats daemon, runs timing, stops tegrastats, parses power log.
+- **Script:** `run_power_sweep.py` -- sets mode, locks clocks, waits 60s thermal settle, starts tegrastats daemon, runs timing, stops tegrastats, parses power log.
 - **tegrastats sampling:** 2-second interval throughout the benchmark run. Each sensor (`VDD_GPU`, `VDD_CPU_SOC_MSS`, `VIN_SYS_5V0`) provides instantaneous and running-average readings.
-- **Timing method:** Same as Phase 3 — `cuda_event`, 5 warmup trials, 100 timed trials per problem.
+- **Timing method:** Same as Phase 3 -- `cuda_event`, 5 warmup trials, 100 timed trials per problem.
 - **Clock verification:** GPU GPC clock confirmed via `/sys/class/devfreq/gpu-gpc-0/cur_freq` before each run.

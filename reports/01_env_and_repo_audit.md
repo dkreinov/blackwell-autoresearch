@@ -1,4 +1,4 @@
-# KernelBench on Jetson AGX Thor — Environment & Repo Audit
+# KernelBench on Jetson AGX Thor -- Environment & Repo Audit
 
 **Date:** 2026-03-18
 **Host:** nvidia-thor-01
@@ -13,7 +13,7 @@
 | GPU | NVIDIA Thor |
 | Architecture | Blackwell |
 | Compute Capability | 11.0 (sm_110) |
-| Memory model | ATS unified (no dedicated VRAM — shared with CPU) |
+| Memory model | ATS unified (no dedicated VRAM -- shared with CPU) |
 | Driver | 580.00 |
 | CUDA version (driver) | 13.0 |
 | CPU | ARM Cortex (aarch64), 14 cores, 2.6 GHz max |
@@ -28,7 +28,7 @@
 | Item | Value |
 |------|-------|
 | nvcc path | `/usr/local/cuda-13.0/bin/nvcc` |
-| nvcc in PATH | **No** — must export PATH |
+| nvcc in PATH | **No** -- must export PATH |
 | CUDA version | 13.0.48 (built Jul 16 2025) |
 | CUDA symlink | `/usr/local/cuda` → `/etc/alternatives/cuda` → cuda-13.0 |
 
@@ -54,7 +54,7 @@
 2. Use `pip install -e .` with Python 3.12 (ignores pyproject version pin)
 3. Create a venv with Python 3.12 and install deps manually
 
-The code itself has no 3.10-specific syntax — the pin is conservative. Python 3.12 is expected to work.
+The code itself has no 3.10-specific syntax -- the pin is conservative. Python 3.12 is expected to work.
 
 ---
 
@@ -88,7 +88,7 @@ Source: NVIDIA Jetson PyTorch release page or build from source.
 
 **Cloned to:** `~/thor_kernelbench_work/KernelBench`
 **Branch:** main
-**Head commit:** `423217d` — update all legacy python commands to UV + document integration
+**Head commit:** `423217d` -- update all legacy python commands to UV + document integration
 
 ### 5a. gpu_arch Handling
 
@@ -109,19 +109,19 @@ self.gpu_arch = ["Ada"]   # must override to ["Blackwell"] for Thor
 ### 5b. sm_110 / Thor explicit support
 
 - `NVIDIA_ARCHS` includes `"Blackwell"` ✓
-- No explicit `sm_110` strings in src/ (not needed — arch name is sufficient)
+- No explicit `sm_110` strings in src/ (not needed -- arch name is sufficient)
 - `eval_from_generations.py:54` Modal mapping does NOT include Thor/Blackwell:
   ```python
   gpu_arch_mapping = {"L40S": ["Ada"], "H100": ["Hopper"], "A100": ["Ampere"], ...}
   ```
-  Minor — only affects Modal cloud path, not local evaluation.
-- `timing.py:138` L2 cache thrash comment mentions `Blackwell~192MB` — codebase is Blackwell-aware.
+  Minor -- only affects Modal cloud path, not local evaluation.
+- `timing.py:138` L2 cache thrash comment mentions `Blackwell~192MB` -- codebase is Blackwell-aware.
 
 ### 5c. x86 / ARM assumptions
 
 - **No explicit x86 assumptions found** in Python source code.
 - CUDA JIT via `torch.utils.cpp_extension` is arch-neutral (compiles on-device).
-- Generated CUDA kernels use standard CUDA C++ — should compile for sm_110 with nvcc 13.0.
+- Generated CUDA kernels use standard CUDA C++ -- should compile for sm_110 with nvcc 13.0.
 
 ### 5d. ARM / CUDA 13 / torch extension risks
 
@@ -131,7 +131,7 @@ self.gpu_arch = ["Ada"]   # must override to ["Blackwell"] for Thor
 | `triton` for aarch64 | High | PyPI triton wheels are x86_64 only. May need source build or skip entirely. |
 | `nvidia-cutlass-dsl` | Unknown | Likely x86 wheel only. Part of `[gpu]` extras. |
 | `tilelang` | Unknown | Experimental DSL, likely lacks aarch64 support. |
-| `torch.compile` / Inductor | Medium | Inductor uses Triton internally — may fail on aarch64. |
+| `torch.compile` / Inductor | Medium | Inductor uses Triton internally -- may fail on aarch64. |
 | Unified memory (ATS) | Low-Medium | Timing differs from discrete GPUs; no `cudaMemcpy` between host/device. |
 | Python 3.10 pin | High | System only has 3.12. Need to relax pin or install 3.10. |
 
@@ -139,7 +139,7 @@ self.gpu_arch = ["Ada"]   # must override to ["Blackwell"] for Thor
 
 | Package | Required for | Status on Thor |
 |---------|-------------|---------------|
-| torch (CUDA) | Everything | **MISSING** — CPU only |
+| torch (CUDA) | Everything | **MISSING** -- CPU only |
 | nvcc | Kernel compilation | Present, not in PATH |
 | ninja | Fast JIT builds | pip-installable, likely OK |
 | pydra-config | Config system | pip-installable, OK |
@@ -176,9 +176,9 @@ self.gpu_arch = ["Ada"]   # must override to ["Blackwell"] for Thor
 
 ### Fix for full benchmark (later)
 
-5. **Triton for aarch64** — investigate NVIDIA wheel or skip triton backend
-6. **cupy** — skip or use `cupy-cuda13x` if it exists
-7. **Python 3.10** — optionally install via deadsnakes if strict compat required
+5. **Triton for aarch64** -- investigate NVIDIA wheel or skip triton backend
+6. **cupy** -- skip or use `cupy-cuda13x` if it exists
+7. **Python 3.10** -- optionally install via deadsnakes if strict compat required
 
 ---
 
@@ -204,8 +204,8 @@ Do NOT start bulk runs until smoke test passes.
 
 ## 8. Pre-existing Work in This Directory
 
-- `~/thor_kernelbench_work/thor_env_report.md` — detailed prior env inventory (Docker, TensorRT, network)
-- `~/thor_kernelbench_work/KernelBench/` — freshly cloned main branch (2026-03-18)
+- `~/thor_kernelbench_work/thor_env_report.md` -- detailed prior env inventory (Docker, TensorRT, network)
+- `~/thor_kernelbench_work/KernelBench/` -- freshly cloned main branch (2026-03-18)
 
 ---
 
@@ -216,7 +216,7 @@ Do NOT start bulk runs until smoke test passes.
 | Environment report | DONE (this doc + thor_env_report.md) |
 | Thor GPU identification (sm_110, Blackwell, CUDA 13) | DONE |
 | Compatibility patch list | DONE (documented above) |
-| Thor-specific patches with git diff | BLOCKED — need CUDA torch first |
+| Thor-specific patches with git diff | BLOCKED -- need CUDA torch first |
 | Baseline timings (torch eager) | BLOCKED |
 | Pilot benchmark results | BLOCKED |
 | Analysis writeup | In progress |
@@ -252,8 +252,8 @@ ssh nvidia@nvidia-thor-01 "cd ~/thor_kernelbench_work && git clone https://githu
 ```
 
 ### Files changed
-- `~/thor_kernelbench_work/KernelBench/` — cloned (no patches yet)
-- `~/thor_kernelbench_work/01_env_and_repo_audit.md` — this file
+- `~/thor_kernelbench_work/KernelBench/` -- cloned (no patches yet)
+- `~/thor_kernelbench_work/01_env_and_repo_audit.md` -- this file
 
 ### Recommended next step
 **Phase 2:** Install CUDA-enabled PyTorch for Jetson AGX Thor (aarch64, CUDA 13.0), verify with smoke test, then install KernelBench core dependencies.
