@@ -2,18 +2,24 @@
   "19": {
     "name": "ReLU",
     "baseline_ms": 27.7,
-    "best_ms": 27.7,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.8,
+    "best_speedup": 1.034,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.8, "speedup": 1.034,
+       "note": "float4 (8 halfs), float32 fmaxf(0,x), default loads/stores, 1024t"}
+    ]
   },
   "20": {
     "name": "LeakyReLU",
     "baseline_ms": 27.8,
-    "best_ms": 27.8,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.8,
+    "best_speedup": 1.037,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.8, "speedup": 1.037,
+       "note": "float4 (8 halfs), float32 x if x>=0 else neg*x, default loads/stores, 1024t"}
+    ]
   },
   "21": {
     "name": "Sigmoid",
@@ -113,10 +119,13 @@
   "28": {
     "name": "HardSigmoid",
     "baseline_ms": 27.8,
-    "best_ms": 27.8,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.8,
+    "best_speedup": 1.037,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.8, "speedup": 1.037,
+       "note": "float4 (8 halfs), float32 clamp((x+3)/6, 0, 1), default loads/stores, 1024t"}
+    ]
   },
   "29": {
     "name": "Softplus",
@@ -162,10 +171,13 @@
   "32": {
     "name": "HardTanh",
     "baseline_ms": 27.7,
-    "best_ms": 27.7,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.8,
+    "best_speedup": 1.034,
+    "iterations": 1,
+    "history": [
+      {"version": 1, "ms": 26.8, "speedup": 1.034,
+       "note": "float4 (8 halfs), float32 clamp(x, min, max), default loads/stores, 1024t"}
+    ]
   },
   "33": {
     "name": "BatchNorm2d",

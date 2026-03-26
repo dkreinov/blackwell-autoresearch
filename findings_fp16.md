@@ -17,10 +17,9 @@ fp16 baseline: 27.7ms (fp32 baseline: 57.5ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.80 | 1.034x | float4 (8 halfs), float32 fmaxf(0,x), default loads/stores, 1024t |
 
-- FAIL custom kernels: all activations at ~28ms baseline are already at the bandwidth floor with PyTorch's vectorized fp16 kernels. Using __stwt on bandwidth-bound kernels causes SLOWDOWN (p21 Sigmoid: 61.8ms with __stwt vs 27.5ms baseline, p22 Tanh: 38.4ms vs 27.8ms, p32 HardTanh: 65.4ms vs 27.7ms). __stwt only helps compute-bound streaming kernels where write-combining isn't critical.
-- KEY INSIGHT: __stwt is harmful for bandwidth-bound kernels. Only use when compute > memory (e.g., Softsign/Swish where baseline was 96.9ms/69ms, not 28ms).
-- FLOOR: ~27-28ms. PyTorch already optimal at the bandwidth floor for these simple activations.
+- NOTE: __stwt causes slowdown for bandwidth-bound kernels. Default stores required.
 
 ### p20 LeakyReLU (fp16)
 
@@ -28,6 +27,7 @@ fp16 baseline: 27.8ms (fp32 baseline: 56.6ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.80 | 1.037x | float4 (8 halfs), float32 x if x>=0 else neg*x, default loads/stores, 1024t |
 
 ### p21 Sigmoid (fp16)
 
@@ -99,6 +99,7 @@ fp16 baseline: 27.8ms (fp32 baseline: 56.7ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.80 | 1.037x | float4 (8 halfs), float32 clamp((x+3)/6, 0, 1) = fminf(1,fmaxf(0,x*0.1667+0.5)), default loads/stores, 1024t |
 
 ### p29 Softplus (fp16)
 
@@ -130,6 +131,7 @@ fp16 baseline: 27.7ms (fp32 baseline: 56.7ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.80 | 1.034x | float4 (8 halfs), float32 fminf(max,fmaxf(min,x)), default loads/stores, 1024t |
 
 ### p33 BatchNorm2d (fp16)
 
