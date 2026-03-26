@@ -689,3 +689,11 @@ Block sweep (256→4096): flat curve, no sensitivity.
 **p96 DONE. 1.896x. Fused single-pass Huber+reduce, float4, 4096 blocks.**
 Note: MSELoss got 2.732x (103ms→37.7ms) with same pattern because PyTorch MSE implementation was slower at baseline.
 
+---
+
+## Phase 9: fp16 Kernels
+
+fp16 precision pass. Same 30 problems, half-precision. Baselines: baseline_level1_fp16.json.
+Results: kernel_results_fp16.json. Kernel files: kernels/fp16/p{pid}_{name}.py.
+Eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/fp16/p{N}_*.py --precision fp16`
+

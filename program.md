@@ -203,14 +203,59 @@ Only commit improvements. Discards are noted in findings.md but not committed.
 
 ---
 
-## 6. Rules
+## 6. fp16 Precision Pass
+
+### Precision Support
+
+KernelBench `eval_kernel_against_ref` natively supports `precision=torch.float16`:
+- Inputs are auto-cast to fp16 via `_process_input_tensor`
+- Both reference Model and custom ModelNew are cast via `.to(dtype=precision)`
+- Correctness tolerance: 1e-2 (vs 1e-4 for fp32)
+- Baseline file: `results/Thor_AGX/baseline_level1_fp16.json`
+
+### fp16 Kernel Patterns
+
+- Use `half2` vectorization (2 halfs per 32-bit operation)
+- For bandwidth-bound kernels, load via `float4` (128 bits = 8 halfs) and reinterpret as `half2[4]`
+- Dtype check: `TORCH_CHECK(x.scalar_type() == torch::kHalf, "x must be float16")`
+- Data pointer: `x.data_ptr<at::Half>()` then reinterpret as `half2*` or `float4*`
+
+### fp16 Intrinsics (sm_110)
+
+| fp32 | fp16 (half2) | Notes |
+|------|-------------|-------|
+| `__expf(x)` | `h2exp(v)` | Paired exp on half2 |
+| `__tanhf(x)` | `h2rcp`, manual | No direct __htanh2, use 1-2/(1+exp(2x)) |
+| `1/(1+exp(-x))` | `h2rcp(__hadd2(one, h2exp(neg_v)))` | Sigmoid pattern |
+| `fmaxf(x, 0)` | `__hmax2(v, zero)` | ReLU |
+| `x * y` | `__hmul2(v, w)` | Paired multiply |
+| `x + y` | `__hadd2(v, w)` | Paired add |
+| `-x` | `__hneg2(v)` | Paired negate |
+| `float4` load | `float4` → `half2[4]` | 128-bit load = 8 halfs |
+
+### fp16 Files
+
+- `kernels/fp16/p{pid}_{name}.py` -- fp16 kernel files
+- `results/Thor_AGX/kernel_results_fp16.json` -- fp16 optimization results
+- `results/Thor_AGX/baseline_level1_fp16.json` -- PyTorch eager fp16 baselines
+- Eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/fp16/p{N}_*.py --precision fp16`
+- Remote: `thor_agent.sh eval-kernel kernels/fp16/p{N}_*.py <N> fp16`
+
+### fp8 and nvfp4 Status
+
+- **fp8 (E4M3/E5M2)**: Casting works on Thor, but elementwise ops not implemented. Only `torch._scaled_mm` (GEMM) supports fp8. Scope: p97 SDPA experiment only.
+- **nvfp4 (float4_e2m1fn_x2)**: dtype exists in PyTorch 2.9.1+cu130 but `copy_` not implemented. Blocked until PyTorch adds support.
+
+---
+
+## 7. Rules
 
 ### Allowed
 - Write custom CUDA kernels using any standard CUDA features
 - Use shared memory, warp shuffles, cooperative groups, vectorized loads
 - Use torch.utils.cpp_extension for compilation
 - Math approximations if numerically acceptable (correctness oracle catches mismatches)
-- FP32 precision (matching baseline)
+- FP32 and FP16 precision (matching baseline per precision pass)
 
 ### NOT Allowed
 - Modify the reference Model class, get_inputs(), or get_init_inputs()
@@ -227,7 +272,7 @@ Only commit improvements. Discards are noted in findings.md but not committed.
 
 ---
 
-## 7. Output Format
+## 8. Output Format
 
 After each experiment (one problem, one change):
 
