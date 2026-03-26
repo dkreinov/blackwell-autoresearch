@@ -141,6 +141,16 @@ fp16 baseline: 64.5ms (fp32 baseline: 91.5ms)
 |---------|-----------|---------|--------|
 | 1 | 30.40 | 2.122x | 1 block/channel, 2-pass, float4 8x unroll, __ldcg pass1 + __ldlu+__stwt pass2, fmaf normalize, float32 weight/bias (must call .float() in forward since .half() converts params) |
 
+- FAIL v2 (30.4ms tied): half2 __hfma2 in pass 2 -- memory-bound, instruction reduction doesn't help
+- FAIL v3 (30.4ms tied): default stores (no __stwt) -- same
+- FAIL v4 (30.5ms): 512 threads -- slightly worse, 1024t optimal
+- FAIL v5 (30.8ms): 256 threads -- worse, too few warps per block
+- FAIL v6 (30.6ms): all default loads/stores (no cache hints) -- slightly worse
+- FAIL v7 (30.4ms tied): 8 blocks/channel (512 total), atomicAdd, 2 kernels -- same bandwidth floor
+- FAIL v8 (30.4ms tied): __stcg stores -- same
+- FAIL v9 (34.2ms): 16x unroll -- register pressure causes slowdown, 8x is optimal
+- FLOOR: 30.4ms (2.122x). 2-pass with __ldcg+__ldlu+__stwt, 1024t, 8x unroll is optimal.
+
 ### p34 InstanceNorm2d (fp16)
 
 fp16 baseline: 82.5ms (fp32 baseline: 135.0ms)
@@ -292,3 +302,32 @@ fp16 baseline: 73.5ms (fp32 baseline: 122.0ms)
 - FAIL v11 (34.90ms): 4x unroll -- fewer outstanding requests, worse than 8x (less ILP and memory pipelining)
 - FLOOR: 34.7ms (2.378x). 2-pass with __ldcg+__ldlu+__stwt is optimal. 1024t max memory bandwidth. 8x unroll is optimal. Remaining gap from ~26ms theoretical is inherent DRAM+L2 bandwidth limit.
 - **Dirty state cleanup** (2026-03-26): discarded stale candidates: p34_instancenorm_candidate.py
+
+### p76 Conv1D_dilated_strided (fp16)
+
+fp16 baseline: 114ms (B=64, IC=64, OC=128, K=3, IL=524280, stride=3, dilation=4, OL=174758)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+
+- FAIL v1 (INCORRECT): direct fp16 conv1d, weight initialized independently in ModelNew (not from reference nn.Conv1d) → correctness fail
+- FAIL v1-fixed (TIMEOUT >120s): direct fp16 conv1d with correct weight (nn.Conv1d inside ModelNew), 1 thread/output, grid=(683, 8192)=5.6M blocks. Scalar float32 fmaf: 275 GFLOP total. At scalar FP32 throughput: >120s. PyTorch cuDNN uses Tensor Cores → cannot compete with scalar kernel on compute-bound problems.
+- BLOCKED: compute-bound (275 GFLOP, 114ms ≈ 2.4 TFLOP/s effective from cuDNN). Custom scalar CUDA kernel cannot match cuDNN Tensor Core path.
+
+### p84 DepthwiseConv2D (fp16)
+
+fp16 baseline: 48.0ms (B=64, C=128, H=256, W=512, KS=3, stride=1, padding=0, OH=254, OW=510)
+Bandwidth floor: ~16ms (4.27 GB data at 273 GB/s). 3x opportunity.
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+| 1 | 24.60 | 1.951x | register sliding-window, 1 block/(b,c)=8192 blocks, 512t, no syncthreads, __ldg reads+__stcs writes |
+
+- FAIL tiled-smem (61.8ms): TILE_W=32, TILE_H=8, 4.2M blocks -- grid overhead dominates trivial per-block work
+- FAIL spatial-loop (40.8ms): 8192 blocks, 1024t, stride-loop over OH*OW, __ldcg reads -- scattered 9 loads per output miss L2 reuse
+- FAIL sliding-smem (38.4ms): 8192 blocks, 512t, 3-row shared memory ring, 2 syncthreads/oy=508 syncs/block -- syncthreads overhead
+- FIRST WIN v1=register-sliding (24.6ms, 1.951x): registers hold 3-row window, __ldg (L1 reuse), no syncthreads
+- FAIL __stwt-output (25.0ms): __stwt slower than __stcs for streaming outputs -- write combining in L2 is better
+- FAIL half2-2col (25.7ms): 256t, 2 cols/thread, half2 FMA -- fewer threads → less memory request parallelism, worse BW
+- FAIL 2-row-unroll (26.7ms): 4 register rows, compute 2 oy per iter -- extra registers hurt, compiler optimization regresses
+- FLOOR NOTE: 24.6ms is 1.54x above bandwidth floor (16ms). Remaining gap: instruction overhead + memory latency in 254-iteration loop per block.

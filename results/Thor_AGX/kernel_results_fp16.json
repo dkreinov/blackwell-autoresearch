@@ -445,5 +445,28 @@
         "note": "float4 (8 halfs), target L1-cached (64KB), atomicAdd global reduce, 2048 blocks x 1024t"
       }
     ]
+  },
+  "76": {
+    "name": "Conv1D_dilated_strided",
+    "baseline_ms": 114.0,
+    "best_ms": 114.0,
+    "best_speedup": 1.0,
+    "iterations": 0,
+    "history": []
+  },
+  "84": {
+    "name": "DepthwiseConv2D",
+    "baseline_ms": 48.0,
+    "best_ms": 24.6,
+    "best_speedup": 1.951,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 24.6,
+        "speedup": 1.951,
+        "note": "register sliding-window, 1 block/(b,c)=8192 blocks, 512t, no syncthreads, __ldg reads+__stcs writes"
+      }
+    ]
   }
 }
