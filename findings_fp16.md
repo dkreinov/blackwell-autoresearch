@@ -45,6 +45,7 @@ fp16 baseline: 36.1ms (fp32 baseline: 100.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 31.00 | 1.165x | online softmax, float4 (8 halfs), __ldcg pass1 + __ldlu+__stwt pass2, 8x unroll, 1024t |
 
 ### p24 LogSoftmax (fp16)
 
@@ -244,5 +245,7 @@ fp16 baseline: 73.5ms (fp32 baseline: 122.0ms)
 - FAIL v8 (INCORRECT): #pragma unroll 4 on outer 8x loop -- 4*8=32 simultaneous float4 = 128 regs, register spill → corruption
 - FAIL v9 (35.70ms): __ldcg for pass2 reads (no eviction) -- worse than __ldlu; L2 pollution from unreleased data hurts next block's pass1 caching
 - KEY INSIGHT: __ldlu in pass2 is strictly better than __ldcg: eviction frees L2 for next block's pass1 data
-- FLOOR: 34.7ms (2.378x). 2-pass with __ldcg+__ldlu+__stwt is optimal. 1024t max memory bandwidth. Remaining gap from 7GB/273GB/s=25.6ms theoretical is inherent DRAM efficiency.
+- FAIL v10 (34.80ms): __launch_bounds__(1024,1) -- no benefit, compiler already uses full register budget
+- FAIL v11 (34.90ms): 4x unroll -- fewer outstanding requests, worse than 8x (less ILP and memory pipelining)
+- FLOOR: 34.7ms (2.378x). 2-pass with __ldcg+__ldlu+__stwt is optimal. 1024t max memory bandwidth. 8x unroll is optimal. Remaining gap from ~26ms theoretical is inherent DRAM+L2 bandwidth limit.
 - **Dirty state cleanup** (2026-03-26): discarded stale candidates: p34_instancenorm_candidate.py
