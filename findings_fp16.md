@@ -237,4 +237,12 @@ fp16 baseline: 73.5ms (fp32 baseline: 122.0ms)
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
 
+- FAIL v4 (42.00ms): 512t -- fewer concurrent memory requests per block, worse DRAM saturation than 1024t
+- FAIL v5 (34.80ms): half2 FMA in pass2 instead of float32 fmaf -- tied, bandwidth floor dominates instruction savings
+- FAIL v6 (34.70ms): 1 syncthreads (all threads reduce ws1/ws2 locally) -- tied, barrier overhead negligible vs memory latency
+- FAIL v7 (34.70ms): 768t (24 warps/block, 2 blocks/SM possible) -- tied with 1024t, no benefit
+- FAIL v8 (INCORRECT): #pragma unroll 4 on outer 8x loop -- 4*8=32 simultaneous float4 = 128 regs, register spill → corruption
+- FAIL v9 (35.70ms): __ldcg for pass2 reads (no eviction) -- worse than __ldlu; L2 pollution from unreleased data hurts next block's pass1 caching
+- KEY INSIGHT: __ldlu in pass2 is strictly better than __ldcg: eviction frees L2 for next block's pass1 data
+- FLOOR: 34.7ms (2.378x). 2-pass with __ldcg+__ldlu+__stwt is optimal. 1024t max memory bandwidth. Remaining gap from 7GB/273GB/s=25.6ms theoretical is inherent DRAM efficiency.
 - **Dirty state cleanup** (2026-03-26): discarded stale candidates: p34_instancenorm_candidate.py
