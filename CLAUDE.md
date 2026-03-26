@@ -5,12 +5,11 @@
 ### nvidia-thor-01
 - **Host:** nvidia-thor-01
 - **User:** nvidia
-- **Password:** `<device-default>`
+- **Password:** `<device default>`
 - **OS:** Ubuntu 24.04.3 LTS (Linux 6.8.12-tegra aarch64) — NVIDIA Jetson/Tegra platform
 
 ```bash
 ssh nvidia@nvidia-thor-01
-# password: <device-default>
 ```
 
 Working directory on the remote host: `~/thor_kernelbench_work`
