@@ -124,6 +124,7 @@ fp16 baseline: 82.5ms (fp32 baseline: 135.0ms)
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
 | 1 | 35.70 | 2.311x | float4 (8 halfs) loads, 8x unroll, float32 accum, 2-pass reduce, __ldcg+__stwt, 1024t |
+| 3 | 34.70 | 2.378x | __ldcg pass1 (L2-only, keeps for pass2 re-read) + __ldlu+__stwt pass2 (evict-after-use + bypass write) |
 
 ### p36 RMSNorm (fp16)
 

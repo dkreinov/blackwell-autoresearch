@@ -7,24 +7,23 @@ cuda_source = """
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
-// v1: 1 block per (b,c), 1024 threads, float4 loads (8 halfs each), 8x unrolled.
-// float32 accumulation for mean/var. 2-pass reduce.
-// __ldcg (L2-only) for pass 1 reads; __stwt (write-through) for outputs.
-// HW=262144. HW/8=32768 float4-chunks. All instances are 16B aligned (HW*2 div 16=0).
+// v3: pass 1 uses __ldcg (L2-only, cache for pass 2 re-read) + pass 2 uses __ldlu+__stwt.
+// Optimal 2-pass cache strategy: keep data in L2 during pass 1, evict in pass 2.
 
-__global__ void instancenorm_fp16_v1(
+__global__ void instancenorm_fp16_v3(
     const __half* __restrict__ x,
     __half* __restrict__ out,
     int HW, float eps
 ) {
     const __half* row = x   + (int64_t)blockIdx.x * HW;
     __half*        op = out + (int64_t)blockIdx.x * HW;
-    int n4 = HW >> 3;  // HW/8
+    int n4 = HW >> 3;
     const float4* row4 = reinterpret_cast<const float4*>(row);
     float4*       out4 = reinterpret_cast<float4*>(op);
     int stride = blockDim.x;
     int stride8 = 8 * stride;
 
+    // Pass 1: __ldcg (L2-only) -- data stays in L2 for pass 2
     float s1 = 0.0f, s2 = 0.0f;
     int j = threadIdx.x;
     for (; j + 7 * stride < n4; j += stride8) {
@@ -79,13 +78,14 @@ __global__ void instancenorm_fp16_v1(
     }
     __syncthreads();
 
+    // Pass 2: __ldlu (evict-after-use) + __stwt (write-through)
     float is = is_sh, bias = bias_sh;
     j = threadIdx.x;
     for (; j + 7 * stride < n4; j += stride8) {
-        float4 A = row4[j],          B = row4[j+stride];
-        float4 C = row4[j+2*stride], D = row4[j+3*stride];
-        float4 E = row4[j+4*stride], F = row4[j+5*stride];
-        float4 G = row4[j+6*stride], H = row4[j+7*stride];
+        float4 A = __ldlu(&row4[j]),          B = __ldlu(&row4[j+stride]);
+        float4 C = __ldlu(&row4[j+2*stride]), D = __ldlu(&row4[j+3*stride]);
+        float4 E = __ldlu(&row4[j+4*stride]), F = __ldlu(&row4[j+5*stride]);
+        float4 G = __ldlu(&row4[j+6*stride]), H = __ldlu(&row4[j+7*stride]);
         #define NORM8(V) ({                                                          \
             const half2* h = (const half2*)&(V);                                    \
             float2 f0=__half22float2(h[0]), f1=__half22float2(h[1]);                \
@@ -105,7 +105,7 @@ __global__ void instancenorm_fp16_v1(
         __stwt(&out4[j+6*stride],rG); __stwt(&out4[j+7*stride], rH);
     }
     for (; j < n4; j += stride) {
-        float4 v = row4[j];
+        float4 v = __ldlu(&row4[j]);
         const half2* h = (const half2*)&v;
         float2 f0=__half22float2(h[0]), f1=__half22float2(h[1]);
         float2 f2=__half22float2(h[2]), f3=__half22float2(h[3]);
@@ -128,7 +128,7 @@ torch::Tensor instancenorm_fp16_cuda(torch::Tensor x, float eps) {
     auto out = torch::empty_like(xc);
     const __half* xp = reinterpret_cast<const __half*>(xc.data_ptr<at::Half>());
     __half* op = reinterpret_cast<__half*>(out.data_ptr<at::Half>());
-    instancenorm_fp16_v1<<<B * C, 1024>>>(xp, op, HW, eps);
+    instancenorm_fp16_v3<<<B * C, 1024>>>(xp, op, HW, eps);
     return out;
 }
 """
@@ -136,7 +136,7 @@ torch::Tensor instancenorm_fp16_cuda(torch::Tensor x, float eps) {
 cpp_source = "torch::Tensor instancenorm_fp16_cuda(torch::Tensor x, float eps);"
 
 module = load_inline(
-    name='instancenorm_fp16_v1',
+    name='instancenorm_fp16_v3',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
     functions=['instancenorm_fp16_cuda'],

@@ -129,15 +129,21 @@
   "34": {
     "name": "InstanceNorm2d",
     "baseline_ms": 82.5,
-    "best_ms": 35.7,
-    "best_speedup": 2.311,
-    "iterations": 1,
+    "best_ms": 34.7,
+    "best_speedup": 2.378,
+    "iterations": 2,
     "history": [
       {
         "version": 1,
         "ms": 35.7,
         "speedup": 2.311,
         "note": "float4 (8 halfs) 8x unroll, float32 accum, 2-pass, __ldcg reads + __stwt writes, 1024t"
+      },
+      {
+        "version": 3,
+        "ms": 34.7,
+        "speedup": 2.378,
+        "note": "__ldcg pass1 (keeps in L2 for pass2 re-read) + __ldlu+__stwt pass2 (evict after use, bypass write cache)"
       }
     ]
   },
