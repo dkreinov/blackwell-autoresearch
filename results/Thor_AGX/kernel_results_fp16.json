@@ -239,10 +239,17 @@
   "88": {
     "name": "MinGPTNewGelu",
     "baseline_ms": 10.5,
-    "best_ms": 10.5,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 1.18,
+    "best_speedup": 8.898,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 1.18,
+        "speedup": 8.898,
+        "note": "float4 (8 halfs), float32 tanhf in GELU, 512t exact-grid, no stride loop"
+      }
+    ]
   },
   "91": {
     "name": "CumsumReverse",

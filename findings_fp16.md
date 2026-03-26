@@ -47,6 +47,9 @@ fp16 baseline: 36.1ms (fp32 baseline: 100.0ms)
 |---------|-----------|---------|--------|
 | 1 | 31.00 | 1.165x | online softmax, float4 (8 halfs), __ldcg pass1 + __ldlu+__stwt pass2, 8x unroll, 1024t |
 
+- FAIL v2 (43.60ms): 512t -- worse, 1024t saturates bandwidth better for 4096-row problem
+- FLOOR: 31.0ms (1.165x). 1024t optimal. Compute-bound by __expf calls in online reduce.
+
 ### p24 LogSoftmax (fp16)
 
 fp16 baseline: 32.6ms (fp32 baseline: 110.0ms)
@@ -186,6 +189,7 @@ fp16 baseline: 10.5ms (fp32 baseline: 19.8ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 1.18 | 8.898x | float4 (8 halfs), float32 tanhf, 512t exact-grid |
 
 ### p91 CumsumReverse (fp16)
 
