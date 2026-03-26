@@ -3,3 +3,7 @@ KernelBench/
 *.log
 __pycache__/
 *.pyc
+.claude/
+loop_state.json
+*.env
+.env*
