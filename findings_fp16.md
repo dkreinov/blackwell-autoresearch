@@ -65,6 +65,7 @@ fp16 baseline: 69.0ms (fp32 baseline: 142.0ms)
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
 | 1 | 46.0 | 1.500x | half2 vectorized, naive loads |
+| 2 | 26.70 | 2.584x | float4 (8 halfs), float32 __fdividef(x, 1+__expf(-x)), __ldlu+__stwt, 1024t exact-grid |
 
 ### p26 GELU (fp16)
 
@@ -93,6 +94,7 @@ fp16 baseline: 28.6ms (fp32 baseline: 56.5ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.80 | 1.067x | float4 (8 halfs), float32 __logf(1+__expf(x)) threshold 20, __ldlu+__stwt, 1024t |
 
 ### p30 Softsign (fp16)
 

@@ -7,12 +7,11 @@ cuda_source = """
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
-// v2: fp16 Swish. Input (4096,393216) fp16.
-// swish(x) = x * sigmoid(x) = x / (1 + exp(-x))
-// float4 (8 halfs), float32 compute (__fdividef), __ldlu+__stwt, 1024t exact-grid.
-// Replaces v1 half2 (h2exp, hadd2, hmul2) with float32 for better throughput.
+// v1: fp16 Softplus. Input (4096,393216) fp16.
+// softplus(x) = log(1 + exp(x)). Numerically stable: x if x > 20, else __logf(1+__expf(x)).
+// float4 (8 halfs), float32 compute, __ldlu+__stwt, 1024t exact-grid.
 
-__global__ void swish_fp16_v2(
+__global__ void softplus_fp16_v1(
     const float4* __restrict__ x,
     float4*       __restrict__ out,
     int64_t n4
@@ -23,20 +22,18 @@ __global__ void swish_fp16_v2(
     const half2* h = (const half2*)&v;
     float2 f0=__half22float2(h[0]), f1=__half22float2(h[1]);
     float2 f2=__half22float2(h[2]), f3=__half22float2(h[3]);
+    #define SP(a) ((a) > 20.0f ? (a) : __logf(1.0f + __expf(a)))
     float4 r;
     half2* hr = (half2*)&r;
-    hr[0] = __floats2half2_rn(__fdividef(f0.x, 1.0f + __expf(-f0.x)),
-                               __fdividef(f0.y, 1.0f + __expf(-f0.y)));
-    hr[1] = __floats2half2_rn(__fdividef(f1.x, 1.0f + __expf(-f1.x)),
-                               __fdividef(f1.y, 1.0f + __expf(-f1.y)));
-    hr[2] = __floats2half2_rn(__fdividef(f2.x, 1.0f + __expf(-f2.x)),
-                               __fdividef(f2.y, 1.0f + __expf(-f2.y)));
-    hr[3] = __floats2half2_rn(__fdividef(f3.x, 1.0f + __expf(-f3.x)),
-                               __fdividef(f3.y, 1.0f + __expf(-f3.y)));
+    hr[0] = __floats2half2_rn(SP(f0.x), SP(f0.y));
+    hr[1] = __floats2half2_rn(SP(f1.x), SP(f1.y));
+    hr[2] = __floats2half2_rn(SP(f2.x), SP(f2.y));
+    hr[3] = __floats2half2_rn(SP(f3.x), SP(f3.y));
+    #undef SP
     __stwt(&out[i], r);
 }
 
-torch::Tensor swish_fp16_cuda(torch::Tensor x) {
+torch::Tensor softplus_fp16_cuda(torch::Tensor x) {
     TORCH_CHECK(x.is_cuda() && x.is_contiguous());
     TORCH_CHECK(x.scalar_type() == torch::kHalf, "x must be float16");
     int64_t n4 = x.numel() >> 3;
@@ -44,18 +41,18 @@ torch::Tensor swish_fp16_cuda(torch::Tensor x) {
     const float4* xp = reinterpret_cast<const float4*>(x.data_ptr<at::Half>());
     float4* op = reinterpret_cast<float4*>(out.data_ptr<at::Half>());
     int64_t block = 1024, grid = (n4 + block - 1) / block;
-    swish_fp16_v2<<<grid, block>>>(xp, op, n4);
+    softplus_fp16_v1<<<grid, block>>>(xp, op, n4);
     return out;
 }
 """
 
-cpp_source = "torch::Tensor swish_fp16_cuda(torch::Tensor x);"
+cpp_source = "torch::Tensor softplus_fp16_cuda(torch::Tensor x);"
 
 module = load_inline(
-    name='swish_fp16_v2',
+    name='softplus_fp16_v1',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
-    functions=['swish_fp16_cuda'],
+    functions=['softplus_fp16_cuda'],
     extra_cuda_cflags=['-O3', '--use_fast_math'],
     verbose=False
 )
@@ -65,4 +62,4 @@ class ModelNew(nn.Module):
         super().__init__()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return module.swish_fp16_cuda(x)
+        return module.softplus_fp16_cuda(x)

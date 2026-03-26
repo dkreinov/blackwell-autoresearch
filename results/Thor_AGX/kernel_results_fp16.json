@@ -64,15 +64,21 @@
   "25": {
     "name": "Swish",
     "baseline_ms": 69.0,
-    "best_ms": 46.0,
-    "best_speedup": 1.5,
-    "iterations": 1,
+    "best_ms": 26.7,
+    "best_speedup": 2.584,
+    "iterations": 2,
     "history": [
       {
         "version": 1,
         "ms": 46.0,
         "speedup": 1.5,
         "note": "half2 vectorized, naive loads"
+      },
+      {
+        "version": 2,
+        "ms": 26.7,
+        "speedup": 2.584,
+        "note": "float4 (8 halfs), float32 __fdividef(x, 1+__expf(-x)), __ldlu+__stwt, 1024t exact-grid"
       }
     ]
   },
@@ -103,10 +109,17 @@
   "29": {
     "name": "Softplus",
     "baseline_ms": 28.6,
-    "best_ms": 28.6,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 26.8,
+    "best_speedup": 1.067,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 26.8,
+        "speedup": 1.067,
+        "note": "float4 (8 halfs), float32 __logf(1+__expf(x)) with threshold 20, __ldlu+__stwt, 1024t"
+      }
+    ]
   },
   "30": {
     "name": "Softsign",
