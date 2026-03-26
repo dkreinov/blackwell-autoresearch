@@ -137,9 +137,9 @@
   "36": {
     "name": "RMSNorm",
     "baseline_ms": 105.0,
-    "best_ms": 41.3,
-    "best_speedup": 2.542,
-    "iterations": 2,
+    "best_ms": 41.0,
+    "best_speedup": 2.561,
+    "iterations": 3,
     "history": [
       {
         "version": 1,
@@ -152,6 +152,12 @@
         "ms": 41.3,
         "speedup": 2.542,
         "note": "__ldcg (L2-only) for reads, bypasses L1 since data > L1, 512t"
+      },
+      {
+        "version": 3,
+        "ms": 41.0,
+        "speedup": 2.561,
+        "note": "__ldcg reads + __stcs (streaming evict-first) writes, 512t"
       }
     ]
   },

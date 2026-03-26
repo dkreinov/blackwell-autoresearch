@@ -7,11 +7,9 @@ cuda_source = """
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
-// v8: __ldcg (cache in L2 only, bypass L1) for channel reads.
-// Data volume = 64*512*512*2 = 32MB >> L1 (256KB), so L1 cache is useless.
-// Bypassing L1 reduces pollution and may improve L2 hit rate for adjacent threads.
-// Use __ldcg for reads, __stcg for writes (streaming, L2 only).
-__global__ void rmsnorm_fp16_v8(
+// v3: __ldcg for reads + __stcs (streaming/evict-first) for writes.
+// Output is written once and never re-read, so evicting it from L2 frees cache for reads.
+__global__ void rmsnorm_fp16_v3(
     const __half* __restrict__ x,
     __half* __restrict__ out,
     int B, int C, int HW, float eps
@@ -28,7 +26,6 @@ __global__ void rmsnorm_fp16_v8(
     float sum = 0.0f;
     #pragma unroll
     for (int c = 0; c < 64; c++) {
-        // __ldcg: load from global, cache in L2 only (not L1)
         v[c] = __half2float(__ldcg(&row[c * HW]));
         sum += v[c] * v[c];
     }
@@ -36,8 +33,11 @@ __global__ void rmsnorm_fp16_v8(
     float inv_rms = rsqrtf(sum / (float)C + eps);
 
     #pragma unroll
-    for (int c = 0; c < 64; c++)
-        op[c * HW] = __float2half(v[c] * inv_rms);
+    for (int c = 0; c < 64; c++) {
+        __half val = __float2half(v[c] * inv_rms);
+        // __stcs: streaming evict-first store (data evicted from L2 after write)
+        __stcs(&op[c * HW], val);
+    }
 }
 
 torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps) {
@@ -52,7 +52,7 @@ torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps) {
     __half* op = reinterpret_cast<__half*>(out.data_ptr<at::Half>());
     int threads = 512;
     int blocks = (B * HW + threads - 1) / threads;
-    rmsnorm_fp16_v8<<<blocks, threads>>>(xp, op, B, C, HW, eps);
+    rmsnorm_fp16_v3<<<blocks, threads>>>(xp, op, B, C, HW, eps);
     return out;
 }
 """
@@ -60,7 +60,7 @@ torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps) {
 cpp_source = "torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps);"
 
 module = load_inline(
-    name='rmsnorm_fp16_v8',
+    name='rmsnorm_fp16_v3',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
     functions=['rmsnorm_fp16_cuda'],
