@@ -100,6 +100,7 @@ fp16 baseline: 96.9ms (fp32 baseline: 197.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 26.70 | 3.629x | float4 (8 halfs), float32 __fdividef, __ldlu+__stwt, 1024t exact-grid |
 
 ### p31 ELU (fp16)
 
