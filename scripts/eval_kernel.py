@@ -4,6 +4,7 @@ Per-problem kernel evaluator with round-robin schedule tracking.
 
 Usage:
     python scripts/eval_kernel.py --pid 25 --kernel kernels/p25_swish.py
+    python scripts/eval_kernel.py --pid 25 --kernel kernels/fp16/p25_swish.py --precision fp16
     python scripts/eval_kernel.py --status       # show all problems' current best + schedule state
     python scripts/eval_kernel.py --next         # print which pid to work on now (handles switching)
     python scripts/eval_kernel.py --clean        # discard any stale _candidate.py files + log them
@@ -18,7 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 WORK = Path(__file__).resolve().parent.parent
-RESULTS_FILE = WORK / "results" / "Thor_AGX" / "kernel_results.json"
+RESULTS_DIR = WORK / "results" / "Thor_AGX"
+RESULTS_FILE = RESULTS_DIR / "kernel_results.json"
 SCHEDULE_FILE = WORK / "schedule.json"
 STATE_FILE = WORK / "loop_state.json"
 KERNELS_DIR = WORK / "kernels"
@@ -78,8 +80,14 @@ def scp_to_thor(local_path: str, remote_name: str):
         raise RuntimeError(f"SCP failed: {result.stderr.strip()}")
 
 
-def run_eval(remote_name: str, pid: int) -> dict:
-    cmd = f'{SSH} "{AGENT} eval-kernel kernels/{remote_name} {pid}"'
+def results_file_for(precision: str) -> Path:
+    if precision == "fp32":
+        return RESULTS_DIR / "kernel_results.json"
+    return RESULTS_DIR / f"kernel_results_{precision}.json"
+
+
+def run_eval(remote_name: str, pid: int, precision: str = "fp32") -> dict:
+    cmd = f'{SSH} "{AGENT} eval-kernel kernels/{remote_name} {pid} {precision}"'
     try:
         result = subprocess.run(
             cmd, shell=True, capture_output=True, text=True, timeout=MAX_EXPERIMENT_S
@@ -176,7 +184,7 @@ def cmd_next():
     return current_pid
 
 
-def cmd_eval(pid: int, kernel_path: str, force_pid: bool = False):
+def cmd_eval(pid: int, kernel_path: str, force_pid: bool = False, precision: str = "fp32"):
     # Schedule enforcement: only eval the currently scheduled pid
     state = load_state()
     if pid != state["current_pid"] and not force_pid:
@@ -192,9 +200,9 @@ def cmd_eval(pid: int, kernel_path: str, force_pid: bool = False):
 
     remote_name = f"eval_pid{pid}_{kernel_path.stem}.py"
 
-    print(f"Evaling pid={pid} kernel={kernel_path.name} ...", flush=True)
+    print(f"Evaling pid={pid} kernel={kernel_path.name} precision={precision} ...", flush=True)
     scp_to_thor(str(kernel_path), remote_name)
-    result = run_eval(remote_name, pid)
+    result = run_eval(remote_name, pid, precision)
 
     if result["status"] == "ok":
         print(f"OK  {result['custom_ms']:.2f}ms  {result['speedup']:.3f}x")
@@ -252,6 +260,8 @@ def main():
     parser.add_argument("--next", action="store_true", help="Print current pid, switch if time elapsed")
     parser.add_argument("--clean", action="store_true", help="Discard stale candidate files")
     parser.add_argument("--force-pid", action="store_true", help="Override schedule enforcement (user-directed only)")
+    parser.add_argument("--precision", type=str, default="fp32", choices=["fp32", "fp16", "bf16"],
+                        help="Precision for eval (default: fp32)")
     args = parser.parse_args()
 
     if args.status:
@@ -261,7 +271,7 @@ def main():
     elif args.clean:
         cmd_clean()
     elif args.pid and args.kernel:
-        cmd_eval(args.pid, args.kernel, force_pid=args.force_pid)
+        cmd_eval(args.pid, args.kernel, force_pid=args.force_pid, precision=args.precision)
     else:
         parser.print_help()
         sys.exit(1)
