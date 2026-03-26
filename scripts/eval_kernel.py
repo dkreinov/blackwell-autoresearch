@@ -23,7 +23,6 @@ RESULTS_DIR = WORK / "results" / "Thor_AGX"
 SCHEDULE_FILE = WORK / "schedule.json"
 STATE_FILE = WORK / "loop_state.json"
 KERNELS_DIR = WORK / "kernels"
-FINDINGS_FILE = WORK / "findings.md"
 
 THOR_HOST = os.environ.get("THOR_HOST", "nvidia-thor-01")
 THOR_USER = os.environ.get("THOR_USER", "nvidia")
@@ -92,6 +91,12 @@ def kernels_dir_for(precision: str) -> Path:
     return KERNELS_DIR / precision
 
 
+def findings_file_for(precision: str) -> Path:
+    if precision == "fp32":
+        return WORK / "findings.md"
+    return WORK / f"findings_{precision}.md"
+
+
 def run_eval(remote_name: str, pid: int, precision: str = "fp32") -> dict:
     cmd = f'{SSH} "{AGENT} eval-kernel kernels/{remote_name} {pid} {precision}"'
     try:
@@ -139,8 +144,9 @@ def clean_candidates(precision: str = "fp32", log_to_findings: bool = True) -> l
 
     if log_to_findings and deleted:
         note = f"\n- **Dirty state cleanup** ({now_iso()[:10]}): discarded stale candidates: {', '.join(deleted)}\n"
-        findings = FINDINGS_FILE.read_text()
-        FINDINGS_FILE.write_text(findings + note)
+        ff = findings_file_for(precision)
+        findings = ff.read_text()
+        ff.write_text(findings + note)
 
     return deleted
 
