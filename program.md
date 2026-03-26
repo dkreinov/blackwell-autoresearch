@@ -136,24 +136,14 @@ Run experiments continuously until externally interrupted. Do not pause for conf
 `schedule.json` defines the problem order. Current phase: heavy kernels (norms, reductions, losses, softmax, scans).
 Each problem has its own independently-evolving kernel file.
 
-### Precision-Dependent Paths
-
-| | fp32 (default) | fp16 |
-|---|---|---|
-| Kernel dir | `kernels/` | `kernels/fp16/` |
-| Kernel file | `kernels/p{pid}_{name}.py` | `kernels/fp16/p{pid}_{name}.py` |
-| Results file | `results/Thor_AGX/kernel_results.json` | `results/Thor_AGX/kernel_results_fp16.json` |
-| Baseline file | `results/Thor_AGX/baseline_level1.json` | `results/Thor_AGX/baseline_level1_fp16.json` |
-| Eval flag | (none) | `--precision fp16` |
-
-Source of truth: the results file for the current precision (see table above).
+Source of truth: `results/Thor_AGX/kernel_results.json` (per-problem best speedup + version history).
 
 ### Files
 
-- `{kernel_dir}/p{pid}_{name}.py` -- current best kernel (evolves in place, git tracks history)
-- `{kernel_dir}/p{pid}_{name}_candidate.py` -- temporary candidate being tested (MUST be deleted after each test)
-- `scripts/eval_kernel.py` -- single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel {kernel_dir}/p{N}_*.py [--precision fp16]`
-- `{results_file}` -- per-problem best speedup + version history
+- `kernels/p{pid}_{name}.py` -- current best kernel (evolves in place, git tracks history)
+- `kernels/p{pid}_{name}_candidate.py` -- temporary candidate being tested (MUST be deleted after each test)
+- `scripts/eval_kernel.py` -- single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{N}_*.py`
+- `results/Thor_AGX/kernel_results.json` -- per-problem best speedup + version history
 - `findings.md` -- per-problem experiment results and failures
 - `schedule.json` -- round-robin order and timing config
 
@@ -165,23 +155,23 @@ Max 2 minutes per experiment (eval times out at 120s).
 **Per-experiment cycle** (repeat until 1hr on current problem, then advance schedule):
 
 1. Read `findings.md` section for current problem -- what has been tried, what failed
-2. Read `{results_file}` -- current best speedup for this problem
-3. Read current kernel file `{kernel_dir}/p{pid}_{name}.py` -- the code to improve
+2. Read `results/Thor_AGX/kernel_results.json` -- current best speedup for this problem
+3. Read current kernel file `kernels/p{pid}_{name}.py` -- the code to improve
 4. Invent ONE targeted change based on:
    - Thor hardware specs (Section 2)
    - What failed before (findings.md for this problem)
    - Ideas that haven't been tried yet
-5. Write the modified kernel to `{kernel_dir}/p{pid}_{name}_candidate.py`
-6. Run: `python scripts/eval_kernel.py --pid <N> --kernel {kernel_dir}/p{pid}_{name}_candidate.py [--precision fp16]`
+5. Write the modified kernel to `kernels/p{pid}_{name}_candidate.py`
+6. Run: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{pid}_{name}_candidate.py`
    - Must complete in <120s or it's discarded
 7. **If result is correct AND faster than current best**:
-   - Copy candidate over `{kernel_dir}/p{pid}_{name}.py`
+   - Copy candidate over `kernels/p{pid}_{name}.py`
    - **Delete the candidate file immediately**
-   - Update `{results_file}` (best_speedup, best_ms, iterations, history)
+   - Update `results/Thor_AGX/kernel_results.json` (best_speedup, best_ms, iterations, history)
    - Update `findings.md` section: add row to table, note what worked
    - **Commit and push immediately**:
-     `git add {kernel_dir}/p{pid}_{name}.py {results_file} findings.md`
-     `git commit -m "p{pid}: {name} v{N} [fp16] -- <change>, {old}x -> {new}x"` (omit [fp16] tag for fp32)
+     `git add kernels/p{pid}_{name}.py results/Thor_AGX/kernel_results.json findings.md`
+     `git commit -m "p{pid}: {name} v{N} -- <change>, {old}x -> {new}x"`
      `git push origin main`
 8. **If result is slower, incorrect, or times out**:
    - **Delete the candidate file immediately**
@@ -194,7 +184,7 @@ Max 2 minutes per experiment (eval times out at 120s).
 - **No _candidate.py files should survive between experiments.** Delete after EVERY test, pass or fail.
 - **Commit each improvement individually**, not in batches. Each commit = one verified speedup.
 - **Push after each commit.** Do not accumulate unpushed commits.
-- Run `python scripts/eval_kernel.py --clean [--precision fp16]` to check for stale candidates before starting a session.
+- Run `python scripts/eval_kernel.py --clean` to check for stale candidates before starting a session.
 
 ### Schedule Enforcement
 
@@ -207,61 +197,13 @@ Max 2 minutes per experiment (eval times out at 120s).
 
 ```
 p{pid}: {name} v{N} -- {one-line change description}, {old_speedup}x -> {new_speedup}x
-p{pid}: {name} v{N} [fp16] -- {one-line change description}, {old_speedup}x -> {new_speedup}x
 ```
-
-Use the `[fp16]` tag for fp16 precision commits. Omit for fp32 (default).
 
 Only commit improvements. Discards are noted in findings.md but not committed.
 
 ---
 
-## 6. fp16 Precision Pass
-
-### Precision Support
-
-KernelBench `eval_kernel_against_ref` natively supports `precision=torch.float16`:
-- Inputs are auto-cast to fp16 via `_process_input_tensor`
-- Both reference Model and custom ModelNew are cast via `.to(dtype=precision)`
-- Correctness tolerance: 1e-2 (vs 1e-4 for fp32)
-- Baseline file: `results/Thor_AGX/baseline_level1_fp16.json`
-
-### fp16 Kernel Patterns
-
-- Use `half2` vectorization (2 halfs per 32-bit operation)
-- For bandwidth-bound kernels, load via `float4` (128 bits = 8 halfs) and reinterpret as `half2[4]`
-- Dtype check: `TORCH_CHECK(x.scalar_type() == torch::kHalf, "x must be float16")`
-- Data pointer: `x.data_ptr<at::Half>()` then reinterpret as `half2*` or `float4*`
-
-### fp16 Intrinsics (sm_110)
-
-| fp32 | fp16 (half2) | Notes |
-|------|-------------|-------|
-| `__expf(x)` | `h2exp(v)` | Paired exp on half2 |
-| `__tanhf(x)` | `h2rcp`, manual | No direct __htanh2, use 1-2/(1+exp(2x)) |
-| `1/(1+exp(-x))` | `h2rcp(__hadd2(one, h2exp(neg_v)))` | Sigmoid pattern |
-| `fmaxf(x, 0)` | `__hmax2(v, zero)` | ReLU |
-| `x * y` | `__hmul2(v, w)` | Paired multiply |
-| `x + y` | `__hadd2(v, w)` | Paired add |
-| `-x` | `__hneg2(v)` | Paired negate |
-| `float4` load | `float4` → `half2[4]` | 128-bit load = 8 halfs |
-
-### fp16 Files
-
-- `kernels/fp16/p{pid}_{name}.py` -- fp16 kernel files
-- `results/Thor_AGX/kernel_results_fp16.json` -- fp16 optimization results
-- `results/Thor_AGX/baseline_level1_fp16.json` -- PyTorch eager fp16 baselines
-- Eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/fp16/p{N}_*.py --precision fp16`
-- Remote: `thor_agent.sh eval-kernel kernels/fp16/p{N}_*.py <N> fp16`
-
-### fp8 and nvfp4 Status
-
-- **fp8 (E4M3/E5M2)**: Casting works on Thor, but elementwise ops not implemented. Only `torch._scaled_mm` (GEMM) supports fp8. Scope: p97 SDPA experiment only.
-- **nvfp4 (float4_e2m1fn_x2)**: dtype exists in PyTorch 2.9.1+cu130 but `copy_` not implemented. Blocked until PyTorch adds support.
-
----
-
-## 7. Rules
+## 6. Rules
 
 ### Allowed
 - Write custom CUDA kernels using any standard CUDA features
@@ -281,11 +223,11 @@ KernelBench `eval_kernel_against_ref` natively supports `precision=torch.float16
 1. First tool call within first response -- no multi-paragraph analysis before acting
 2. No cycle estimation in prose -- the benchmark is the oracle
 3. One response = one action -- every response must contain a tool call
-4. If resuming from context summary: read `{results_file}` + schedule.json, pick current problem, execute immediately
+4. If resuming from context summary: read `kernel_results.json` + schedule.json, pick current problem, execute immediately
 
 ---
 
-## 8. Output Format
+## 7. Output Format
 
 After each experiment (one problem, one change):
 
