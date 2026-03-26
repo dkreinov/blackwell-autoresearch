@@ -172,4 +172,7 @@ class ModelNew(nn.Module):
         self.bias   = nn.Parameter(torch.zeros(num_features))  # float32
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return module.batchnorm_fp16_cuda(x, self.weight, self.bias, 1e-5)
+        # Ensure float32 for CUDA kernel (weight/bias may be cast to fp16 by .half())
+        w = self.weight.float() if self.weight.dtype != torch.float32 else self.weight
+        b = self.bias.float() if self.bias.dtype != torch.float32 else self.bias
+        return module.batchnorm_fp16_cuda(x, w, b, 1e-5)

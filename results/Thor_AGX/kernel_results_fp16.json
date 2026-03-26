@@ -49,10 +49,17 @@
   "24": {
     "name": "LogSoftmax",
     "baseline_ms": 32.6,
-    "best_ms": 32.6,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 31.0,
+    "best_speedup": 1.052,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 31.0,
+        "speedup": 1.052,
+        "note": "online logsoftmax, float4 (8 halfs), __ldcg pass1 + __ldlu+__stwt pass2, 8x unroll, 1024t"
+      }
+    ]
   },
   "25": {
     "name": "Swish",
@@ -128,10 +135,17 @@
   "33": {
     "name": "BatchNorm2d",
     "baseline_ms": 64.5,
-    "best_ms": 64.5,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 30.4,
+    "best_speedup": 2.122,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 30.4,
+        "speedup": 2.122,
+        "note": "1 block/channel, 2-pass, float4 8x unroll, __ldcg pass1 + __ldlu+__stwt pass2, fmaf normalize, float32 weight/bias"
+      }
+    ]
   },
   "34": {
     "name": "InstanceNorm2d",
@@ -151,6 +165,21 @@
         "ms": 34.7,
         "speedup": 2.378,
         "note": "__ldcg pass1 (keeps in L2 for pass2 re-read) + __ldlu+__stwt pass2 (evict after use, bypass write cache)"
+      }
+    ]
+  },
+  "35": {
+    "name": "GroupNorm",
+    "baseline_ms": 86.5,
+    "best_ms": 52.9,
+    "best_speedup": 1.635,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 52.9,
+        "speedup": 1.635,
+        "note": "896 blocks (B*G), 1024t, 2-pass, float4 8x unroll, __ldcg+__ldlu+__stwt, channel via j>>15, per-channel affine"
       }
     ]
   },
@@ -202,10 +231,17 @@
   "37": {
     "name": "FrobeniusNorm",
     "baseline_ms": 64.4,
-    "best_ms": 64.4,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 53.6,
+    "best_speedup": 1.201,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 53.6,
+        "speedup": 1.201,
+        "note": "2-kernel: atomicAdd partial_sums (1024x1024t) + normalize (__ldlu+__stwt+__hmul2)"
+      }
+    ]
   },
   "38": {
     "name": "L1Norm",
@@ -231,10 +267,17 @@
   "39": {
     "name": "L2Norm",
     "baseline_ms": 80.0,
-    "best_ms": 80.0,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 41.5,
+    "best_speedup": 1.928,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 41.5,
+        "speedup": 1.928,
+        "note": "fused 2-pass, float4 (8 halfs), float32 accum, __ldcg pass1 + __ldlu+__stwt pass2, 8x unroll, 1024t"
+      }
+    ]
   },
   "88": {
     "name": "MinGPTNewGelu",
@@ -254,10 +297,17 @@
   "91": {
     "name": "CumsumReverse",
     "baseline_ms": 99.0,
-    "best_ms": 99.0,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 98.8,
+    "best_speedup": 1.002,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 98.8,
+        "speedup": 1.002,
+        "note": "PyTorch flip+cumsum+flip fallback (matches reference fp16 semantics, float32 CUDA kernel failed correctness)"
+      }
+    ]
   },
   "92": {
     "name": "CumsumExclusive",
@@ -277,26 +327,47 @@
   "93": {
     "name": "MaskedCumsum",
     "baseline_ms": 73.1,
-    "best_ms": 73.1,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 72.5,
+    "best_speedup": 1.008,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 72.5,
+        "speedup": 1.008,
+        "note": "PyTorch cumsum(x*mask) fallback (matches reference fp16 semantics, float32 CUDA kernel failed correctness)"
+      }
+    ]
   },
   "94": {
     "name": "MSELoss",
     "baseline_ms": 55.1,
-    "best_ms": 55.1,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 18.9,
+    "best_speedup": 2.915,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 18.9,
+        "speedup": 2.915,
+        "note": "float4 (8 halfs), 2048 blocks x 1024t, atomicAdd global reduce, float32 accumulation, __ldcg both inputs"
+      }
+    ]
   },
   "96": {
     "name": "HuberLoss",
     "baseline_ms": 36.9,
-    "best_ms": 36.9,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 18.9,
+    "best_speedup": 1.952,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 18.9,
+        "speedup": 1.952,
+        "note": "smooth_l1, float4 (8 halfs), 2048 blocks x 1024t, atomicAdd global reduce, float32 accumulation"
+      }
+    ]
   },
   "97": {
     "name": "ScaledDotProductAttention",
@@ -316,9 +387,16 @@
   "100": {
     "name": "HingeLoss",
     "baseline_ms": 73.5,
-    "best_ms": 73.5,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 8.91,
+    "best_speedup": 8.249,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 8.91,
+        "speedup": 8.249,
+        "note": "float4 (8 halfs), target L1-cached (64KB), atomicAdd global reduce, 2048 blocks x 1024t"
+      }
+    ]
   }
 }

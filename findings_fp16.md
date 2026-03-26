@@ -56,6 +56,7 @@ fp16 baseline: 32.6ms (fp32 baseline: 110.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 31.00 | 1.052x | online logsoftmax, float4 (8 halfs), __ldcg pass1 + __ldlu+__stwt pass2, 8x unroll, 1024t |
 
 ### p25 Swish (fp16)
 
@@ -120,6 +121,7 @@ fp16 baseline: 64.5ms (fp32 baseline: 91.5ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 30.40 | 2.122x | 1 block/channel, 2-pass, float4 8x unroll, __ldcg pass1 + __ldlu+__stwt pass2, fmaf normalize, float32 weight/bias (must call .float() in forward since .half() converts params) |
 
 ### p34 InstanceNorm2d (fp16)
 
@@ -129,6 +131,14 @@ fp16 baseline: 82.5ms (fp32 baseline: 135.0ms)
 |---------|-----------|---------|--------|
 | 1 | 35.70 | 2.311x | float4 (8 halfs) loads, 8x unroll, float32 accum, 2-pass reduce, __ldcg+__stwt, 1024t |
 | 3 | 34.70 | 2.378x | __ldcg pass1 (L2-only, keeps for pass2 re-read) + __ldlu+__stwt pass2 (evict-after-use + bypass write) |
+
+### p35 GroupNorm (fp16)
+
+fp16 baseline: 86.5ms (fp32 baseline: N/A)
+
+| Version | Time (ms) | Speedup | Change |
+|---------|-----------|---------|--------|
+| 1 | 52.90 | 1.635x | 896 blocks (B*G), 1024t, 2-pass, float4 8x unroll, __ldcg+__ldlu+__stwt, channel index via j>>15 (HW4=32768=2^15), per-channel affine with float32 wt/bi |
 
 ### p36 RMSNorm (fp16)
 
@@ -163,6 +173,7 @@ fp16 baseline: 64.4ms (fp32 baseline: 98.5ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 53.60 | 1.201x | 2-kernel: atomicAdd partial_sums into float array (1024×1024t), CPU rsqrt, normalize pass (__ldlu+__stwt+__hmul2) |
 
 ### p38 L1Norm (fp16)
 
@@ -182,6 +193,7 @@ fp16 baseline: 80.0ms (fp32 baseline: 118.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 41.50 | 1.928x | fused 2-pass, float4 (8 halfs), float32 accum sumsq, __ldcg pass1 + __ldlu+__stwt pass2, 8x unroll, 1024t |
 
 ### p88 MinGPTNewGelu (fp16)
 
@@ -198,6 +210,9 @@ fp16 baseline: 99.0ms (fp32 baseline: 110.0ms)
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
 
+- FAIL v1 (INCORRECT, max_diff=2952): tile-based suffix scan, float32 accumulation -- PyTorch fp16 cumsum accumulates in fp16, causing ~14% underestimation at n=32768 (ref≈13568 vs float32≈16312). Our more-accurate result fails the correctness check.
+- APPROACH: PyTorch flip+cumsum+flip fallback (identical to reference, max_diff=0). No speedup possible without exactly replicating fp16 accumulation semantics.
+
 ### p92 CumsumExclusive (fp16)
 
 fp16 baseline: 102.0ms (fp32 baseline: 122.0ms)
@@ -212,6 +227,9 @@ fp16 baseline: 73.1ms (fp32 baseline: 90.5ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 72.50 | 1.008x | PyTorch cumsum(x*mask) fallback (matches reference fp16 semantics) |
+
+- FAIL custom CUDA v1 (INCORRECT, max_diff=1276): float32 accumulation diverges from PyTorch's fp16 cumsum at large N (same issue as p91/p93 cumsum operations)
 
 ### p94 MSELoss (fp16)
 
@@ -219,6 +237,7 @@ fp16 baseline: 55.1ms (fp32 baseline: 103.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 18.90 | 2.915x | float4 (8 halfs), 2048×1024t, atomicAdd global reduce, float32 accum, __ldcg both inputs |
 
 ### p96 HuberLoss (fp16)
 
@@ -226,6 +245,7 @@ fp16 baseline: 36.9ms (fp32 baseline: 69.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 18.90 | 1.952x | smooth_l1, float4 (8 halfs), 2048×1024t, atomicAdd global reduce, float32 accum |
 
 ### p97 ScaledDotProductAttention (fp16)
 
@@ -241,6 +261,7 @@ fp16 baseline: 73.5ms (fp32 baseline: 122.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 8.91 | 8.249x | float4 (8 halfs), target L1-cached, atomicAdd reduce, 2048x1024t |
 
 - FAIL v4 (42.00ms): 512t -- fewer concurrent memory requests per block, worse DRAM saturation than 1024t
 - FAIL v5 (34.80ms): half2 FMA in pass2 instead of float32 fmaf -- tied, bandwidth floor dominates instruction savings
