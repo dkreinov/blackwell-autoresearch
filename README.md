@@ -19,6 +19,8 @@
 
 ## Kernel Optimization Results
 
+![Speedup chart](assets/speedup_chart.png)
+
 ### Top Speedups
 
 | PID | Name | Baseline | Best | Speedup | Technique |
