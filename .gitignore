@@ -9,3 +9,5 @@ schedule.json
 CLAUDE.md
 *.env
 .env*
+work_log.md
+*_candidate.py
