@@ -152,6 +152,22 @@ One failure in both modes: problem #95 (CrossEntropyLoss) -- `nll_loss` kernel n
 
 ---
 
+## Reports
+
+| # | Report | What it covers |
+|---|--------|----------------|
+| 00 | [Environment Inventory](reports/00_thor_env_report.md) | GPU, CUDA, Python, Docker baseline on Thor |
+| 01 | [Compatibility Audit](reports/01_env_and_repo_audit.md) | KernelBench on aarch64/sm_110 — risks and patches |
+| 02 | [Patches Applied](reports/02_thor_compatibility_patches.md) | Two changes to run KernelBench on Thor |
+| 03 | [Smoke Tests](reports/03_smoke_test.md) | End-to-end validation before full runs |
+| 04 | [Baseline Pilot](reports/04_baseline_pilot.md) | Level 1 baseline — 99/100 pass, per-category stats |
+| 05 | [Power Characterization](reports/05_power_characterization.md) | MAXN vs 120W — perf/watt tradeoffs |
+| 06 | [Activation Optimization](reports/06_activation_optimization.md) | 13 activation kernels — float4, pass fusion, intrinsics |
+| 07 | [Heavy Kernel Optimization](reports/07_heavy_kernel_optimization.md) | 17 kernels — norms, losses, scans, attention, conv |
+| 08 | [Thor vs H100 Transferability](reports/08_thor_vs_h100_transferability.md) | Which H100 optimizations survive on unified memory |
+
+---
+
 ## How to Reproduce
 
 ### Prerequisites

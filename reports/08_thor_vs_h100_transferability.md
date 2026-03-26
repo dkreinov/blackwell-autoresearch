@@ -82,7 +82,7 @@ The 1024t configuration was discovered through benchmarking on Thor specifically
 
 ### Category C: Thor-Specific — H100 Approach Actively Harmful
 
-**MSELoss: The Smoking Gun (H100=1.03x → Thor=0.35x)**
+**MSELoss: Platform-Specific Regression (H100=1.03x → Thor=0.35x)**
 
 Sakana's H100 MSELoss kernel: 3x SLOWER than PyTorch baseline on Thor. Our Thor kernel: 2.73x faster.
 

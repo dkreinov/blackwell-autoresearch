@@ -47,7 +47,7 @@ print(f'  CUDA: {torch.version.cuda}')
     nvcc --version 2>&1 | grep "release" || fail "nvcc not found"
     echo ""
     echo "--- Power Mode ---"
-    echo "nvidia" | sudo -S nvpmodel -q 2>/dev/null || info "nvpmodel unavailable"
+    sudo nvpmodel -q 2>/dev/null || info "nvpmodel unavailable (configure passwordless sudo)"
     echo ""
     echo "=== Health check complete ==="
 }
