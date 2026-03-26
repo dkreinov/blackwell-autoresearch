@@ -20,7 +20,6 @@ from pathlib import Path
 
 WORK = Path(__file__).resolve().parent.parent
 RESULTS_DIR = WORK / "results" / "Thor_AGX"
-RESULTS_FILE = RESULTS_DIR / "kernel_results.json"
 SCHEDULE_FILE = WORK / "schedule.json"
 STATE_FILE = WORK / "loop_state.json"
 KERNELS_DIR = WORK / "kernels"
@@ -39,9 +38,10 @@ def load_schedule() -> dict:
     return json.loads(SCHEDULE_FILE.read_text())
 
 
-def load_results() -> dict:
-    if RESULTS_FILE.exists():
-        return json.loads(RESULTS_FILE.read_text())
+def load_results(precision: str = "fp32") -> dict:
+    f = results_file_for(precision)
+    if f.exists():
+        return json.loads(f.read_text())
     return {}
 
 
@@ -86,6 +86,12 @@ def results_file_for(precision: str) -> Path:
     return RESULTS_DIR / f"kernel_results_{precision}.json"
 
 
+def kernels_dir_for(precision: str) -> Path:
+    if precision == "fp32":
+        return KERNELS_DIR
+    return KERNELS_DIR / precision
+
+
 def run_eval(remote_name: str, pid: int, precision: str = "fp32") -> dict:
     cmd = f'{SSH} "{AGENT} eval-kernel kernels/{remote_name} {pid} {precision}"'
     try:
@@ -119,9 +125,9 @@ def run_eval(remote_name: str, pid: int, precision: str = "fp32") -> dict:
     return info
 
 
-def clean_candidates(log_to_findings: bool = True) -> list[str]:
+def clean_candidates(precision: str = "fp32", log_to_findings: bool = True) -> list[str]:
     """Delete any leftover _candidate.py files. Returns list of deleted files."""
-    candidates = list(KERNELS_DIR.glob("*_candidate.py"))
+    candidates = list(kernels_dir_for(precision).glob("*_candidate.py"))
     if not candidates:
         return []
 
@@ -139,15 +145,15 @@ def clean_candidates(log_to_findings: bool = True) -> list[str]:
     return deleted
 
 
-def cmd_clean():
-    deleted = clean_candidates(log_to_findings=True)
+def cmd_clean(precision: str = "fp32"):
+    deleted = clean_candidates(precision=precision, log_to_findings=True)
     if deleted:
         print(f"Cleaned {len(deleted)} stale candidate(s): {deleted}")
     else:
         print("No stale candidates found.")
 
 
-def cmd_next():
+def cmd_next(precision: str = "fp32"):
     """Print current pid, handle switching if time elapsed."""
     schedule = load_schedule()
     state = load_state()
@@ -166,7 +172,7 @@ def cmd_next():
         print(f"SWITCH: {names[str(old_pid)]} (pid={old_pid}) time elapsed ({elapsed:.0f}s >= {time_limit}s)")
 
         # Clean up any dirty candidates before switching
-        deleted = clean_candidates(log_to_findings=True)
+        deleted = clean_candidates(precision=precision, log_to_findings=True)
         if deleted:
             print(f"  Cleaned dirty candidates: {deleted}")
 
@@ -220,14 +226,14 @@ def cmd_eval(pid: int, kernel_path: str, force_pid: bool = False, precision: str
     return result
 
 
-def cmd_status():
-    results = load_results()
+def cmd_status(precision: str = "fp32"):
+    results = load_results(precision)
     schedule = load_schedule()
     names = schedule.get("names", {})
     state = load_state()
 
     # Check for stale candidates
-    candidates = list(KERNELS_DIR.glob("*_candidate.py"))
+    candidates = list(kernels_dir_for(precision).glob("*_candidate.py"))
     if candidates:
         print(f"\n*** DIRTY STATE: {len(candidates)} stale candidate(s) found:")
         for c in candidates:
@@ -265,11 +271,11 @@ def main():
     args = parser.parse_args()
 
     if args.status:
-        cmd_status()
+        cmd_status(args.precision)
     elif args.next:
-        cmd_next()
+        cmd_next(args.precision)
     elif args.clean:
-        cmd_clean()
+        cmd_clean(args.precision)
     elif args.pid and args.kernel:
         cmd_eval(args.pid, args.kernel, force_pid=args.force_pid, precision=args.precision)
     else:
