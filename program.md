@@ -136,14 +136,24 @@ Run experiments continuously until externally interrupted. Do not pause for conf
 `schedule.json` defines the problem order. Current phase: heavy kernels (norms, reductions, losses, softmax, scans).
 Each problem has its own independently-evolving kernel file.
 
-Source of truth: `results/Thor_AGX/kernel_results.json` (per-problem best speedup + version history).
+### Precision-Dependent Paths
+
+| | fp32 (default) | fp16 |
+|---|---|---|
+| Kernel dir | `kernels/` | `kernels/fp16/` |
+| Kernel file | `kernels/p{pid}_{name}.py` | `kernels/fp16/p{pid}_{name}.py` |
+| Results file | `results/Thor_AGX/kernel_results.json` | `results/Thor_AGX/kernel_results_fp16.json` |
+| Baseline file | `results/Thor_AGX/baseline_level1.json` | `results/Thor_AGX/baseline_level1_fp16.json` |
+| Eval flag | (none) | `--precision fp16` |
+
+Source of truth: the results file for the current precision (see table above).
 
 ### Files
 
-- `kernels/p{pid}_{name}.py` -- current best kernel (evolves in place, git tracks history)
-- `kernels/p{pid}_{name}_candidate.py` -- temporary candidate being tested (MUST be deleted after each test)
-- `scripts/eval_kernel.py` -- single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{N}_*.py`
-- `results/Thor_AGX/kernel_results.json` -- per-problem best speedup + version history
+- `{kernel_dir}/p{pid}_{name}.py` -- current best kernel (evolves in place, git tracks history)
+- `{kernel_dir}/p{pid}_{name}_candidate.py` -- temporary candidate being tested (MUST be deleted after each test)
+- `scripts/eval_kernel.py` -- single-problem eval: `python scripts/eval_kernel.py --pid <N> --kernel {kernel_dir}/p{N}_*.py [--precision fp16]`
+- `{results_file}` -- per-problem best speedup + version history
 - `findings.md` -- per-problem experiment results and failures
 - `schedule.json` -- round-robin order and timing config
 
@@ -155,23 +165,23 @@ Max 2 minutes per experiment (eval times out at 120s).
 **Per-experiment cycle** (repeat until 1hr on current problem, then advance schedule):
 
 1. Read `findings.md` section for current problem -- what has been tried, what failed
-2. Read `results/Thor_AGX/kernel_results.json` -- current best speedup for this problem
-3. Read current kernel file `kernels/p{pid}_{name}.py` -- the code to improve
+2. Read `{results_file}` -- current best speedup for this problem
+3. Read current kernel file `{kernel_dir}/p{pid}_{name}.py` -- the code to improve
 4. Invent ONE targeted change based on:
    - Thor hardware specs (Section 2)
    - What failed before (findings.md for this problem)
    - Ideas that haven't been tried yet
-5. Write the modified kernel to `kernels/p{pid}_{name}_candidate.py`
-6. Run: `python scripts/eval_kernel.py --pid <N> --kernel kernels/p{pid}_{name}_candidate.py`
+5. Write the modified kernel to `{kernel_dir}/p{pid}_{name}_candidate.py`
+6. Run: `python scripts/eval_kernel.py --pid <N> --kernel {kernel_dir}/p{pid}_{name}_candidate.py [--precision fp16]`
    - Must complete in <120s or it's discarded
 7. **If result is correct AND faster than current best**:
-   - Copy candidate over `kernels/p{pid}_{name}.py`
+   - Copy candidate over `{kernel_dir}/p{pid}_{name}.py`
    - **Delete the candidate file immediately**
-   - Update `results/Thor_AGX/kernel_results.json` (best_speedup, best_ms, iterations, history)
+   - Update `{results_file}` (best_speedup, best_ms, iterations, history)
    - Update `findings.md` section: add row to table, note what worked
    - **Commit and push immediately**:
-     `git add kernels/p{pid}_{name}.py results/Thor_AGX/kernel_results.json findings.md`
-     `git commit -m "p{pid}: {name} v{N} -- <change>, {old}x -> {new}x"`
+     `git add {kernel_dir}/p{pid}_{name}.py {results_file} findings.md`
+     `git commit -m "p{pid}: {name} v{N} [fp16] -- <change>, {old}x -> {new}x"` (omit [fp16] tag for fp32)
      `git push origin main`
 8. **If result is slower, incorrect, or times out**:
    - **Delete the candidate file immediately**
@@ -184,7 +194,7 @@ Max 2 minutes per experiment (eval times out at 120s).
 - **No _candidate.py files should survive between experiments.** Delete after EVERY test, pass or fail.
 - **Commit each improvement individually**, not in batches. Each commit = one verified speedup.
 - **Push after each commit.** Do not accumulate unpushed commits.
-- Run `--clean` or `ls kernels/*_candidate.py` to check for stale candidates before starting a session.
+- Run `python scripts/eval_kernel.py --clean [--precision fp16]` to check for stale candidates before starting a session.
 
 ### Schedule Enforcement
 
@@ -197,7 +207,10 @@ Max 2 minutes per experiment (eval times out at 120s).
 
 ```
 p{pid}: {name} v{N} -- {one-line change description}, {old_speedup}x -> {new_speedup}x
+p{pid}: {name} v{N} [fp16] -- {one-line change description}, {old_speedup}x -> {new_speedup}x
 ```
+
+Use the `[fp16]` tag for fp16 precision commits. Omit for fp32 (default).
 
 Only commit improvements. Discards are noted in findings.md but not committed.
 
@@ -268,7 +281,7 @@ KernelBench `eval_kernel_against_ref` natively supports `precision=torch.float16
 1. First tool call within first response -- no multi-paragraph analysis before acting
 2. No cycle estimation in prose -- the benchmark is the oracle
 3. One response = one action -- every response must contain a tool call
-4. If resuming from context summary: read kernel_results.json + schedule.json, pick current problem, execute immediately
+4. If resuming from context summary: read `{results_file}` + schedule.json, pick current problem, execute immediately
 
 ---
 
