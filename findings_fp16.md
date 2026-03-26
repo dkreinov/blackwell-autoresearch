@@ -123,6 +123,7 @@ fp16 baseline: 82.5ms (fp32 baseline: 135.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 35.70 | 2.311x | float4 (8 halfs) loads, 8x unroll, float32 accum, 2-pass reduce, __ldcg+__stwt, 1024t |
 
 ### p36 RMSNorm (fp16)
 
@@ -234,3 +235,5 @@ fp16 baseline: 73.5ms (fp32 baseline: 122.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+
+- **Dirty state cleanup** (2026-03-26): discarded stale candidates: p34_instancenorm_candidate.py

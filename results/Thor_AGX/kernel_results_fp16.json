@@ -129,10 +129,17 @@
   "34": {
     "name": "InstanceNorm2d",
     "baseline_ms": 82.5,
-    "best_ms": 82.5,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 35.7,
+    "best_speedup": 2.311,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 35.7,
+        "speedup": 2.311,
+        "note": "float4 (8 halfs) 8x unroll, float32 accum, 2-pass, __ldcg reads + __stwt writes, 1024t"
+      }
+    ]
   },
   "36": {
     "name": "RMSNorm",
