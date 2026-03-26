@@ -256,7 +256,9 @@ See [`reports/02_thor_compatibility_patches.md`](reports/02_thor_compatibility_p
 - [x] **Power characterization** -- MAXN vs 120W comparison
 - [x] **Sakana kernel transfer study** -- 63 H100 kernels evaluated on Thor (32 compiled, 23 faster)
 - [x] **Autonomous kernel optimization** -- 30 problems optimized, 28 beat or match baseline
-- [ ] **Mixed precision (fp16, bf16, int8, fp8)** -- All current results are fp32; quantized kernels are next
+- [ ] **fp16 precision pass** -- half2-vectorized CUDA kernels for all 30 problems *(in progress -- baselines measured, infrastructure ready)*
+- [ ] **fp8 GEMM experiment** -- fp8 E4M3 via `torch._scaled_mm` for SDPA (p97) -- elementwise ops not yet supported in PyTorch
+- [ ] **nvfp4** -- dtype exists in PyTorch 2.9.1+cu130 but ops not implemented; waiting on PyTorch support
 - [ ] **Level 2 & 3 baselines** -- Operator fusion (100 problems) and full architectures (50 problems)
 - [ ] **torch.compile baselines** -- Compare eager vs Inductor-compiled performance
 - [ ] **Publish findings** -- Blog post: "Autonomous CUDA Kernel Optimization on Edge Blackwell" *(coming soon)*
