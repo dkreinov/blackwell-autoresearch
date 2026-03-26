@@ -4,6 +4,8 @@
 
 **30 problems optimized. 28 beat or match PyTorch. Best: 8.6x (MinGPTNewGelu), 6.3x (HingeLoss), 2.9x (CumsumReverse).**
 
+> **How it works:** All 30 CUDA kernels were written autonomously by [Claude Code](https://claude.ai/code) running an agentic optimization loop — no human-written kernel code. Each iteration compiles on-device, checks correctness, benchmarks, and decides the next experiment. Inspired by [Sakana AI's autoresearch approach](https://github.com/SakanaAI/AI-Scientist).
+
 | | |
 |---|---|
 | **Hardware** | NVIDIA Jetson AGX Thor -- Blackwell, sm_110, compute capability 11.0 |
@@ -130,15 +132,20 @@ One failure in both modes: problem #95 (CrossEntropyLoss) -- `nll_loss` kernel n
 |   |-- 08_thor_vs_h100_transferability.md # Which optimizations transfer from H100 to Thor
 |-- scripts/
 |   |-- eval_kernel.py                  # Per-problem kernel eval (correctness + benchmark)
+|   |-- eval_activations.py             # Batch eval across all activation kernels
 |   |-- run_baseline_timing.py          # Baseline timing with timeout/OOM handling
 |   |-- run_power_sweep.py              # Power mode sweep with tegrastats monitoring
 |   |-- analyze_baseline.py             # Stats and per-category analysis
+|   |-- compare_thor_h100.py            # Thor vs H100 baseline comparison
+|   |-- analyze_transfer.py             # Sakana kernel transfer analysis
+|-- templates/                          # CUDA kernel templates used by autoresearch loop
 |-- results/
 |   |-- Thor_AGX/
 |       |-- baseline_level1.json        # MAXN baseline (99 problems)
 |       |-- kernel_results.json         # All 30 optimized kernel results
 |       |-- power_MAXN_level1_1-100.json  # MAXN with tegrastats
 |       |-- power_120W_level1_1-100.json  # 120W with tegrastats
+|       |-- sakana_transfer_level1.json # Sakana H100 kernel transfer results
 ```
 
 ---
@@ -233,7 +240,7 @@ See [`reports/02_thor_compatibility_patches.md`](reports/02_thor_compatibility_p
 - [x] **Autonomous kernel optimization** -- 30 problems optimized, 28 beat or match baseline
 - [ ] **Level 2 & 3 baselines** -- Operator fusion (100 problems) and full architectures (50 problems)
 - [ ] **torch.compile baselines** -- Compare eager vs Inductor-compiled performance
-- [ ] **Publish findings** -- Blog post: "CUDA Kernel Optimization on Edge Blackwell"
+- [ ] **Publish findings** -- Blog post: "Autonomous CUDA Kernel Optimization on Edge Blackwell" *(coming soon)*
 
 ---
 
