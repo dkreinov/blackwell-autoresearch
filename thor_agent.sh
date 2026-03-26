@@ -89,8 +89,10 @@ else:
 cmd_eval_kernel() {
     # Evaluate a kernel file against the reference
     # Kernel file must be a Python file with ModelNew class
-    local kernel_file="${1:?Usage: thor_agent.sh eval-kernel <kernel_file.py> <problem_id>}"
-    local pid="${2:?Usage: thor_agent.sh eval-kernel <kernel_file.py> <problem_id>}"
+    # Optional 3rd arg: precision (fp32|fp16|bf16, default fp32)
+    local kernel_file="${1:?Usage: thor_agent.sh eval-kernel <kernel_file.py> <problem_id> [precision]}"
+    local pid="${2:?Usage: thor_agent.sh eval-kernel <kernel_file.py> <problem_id> [precision]}"
+    local precision="${3:-fp32}"
     local run_log="$RESULTS/eval_run.log"
 
     if [ ! -f "$kernel_file" ]; then
@@ -103,13 +105,22 @@ cmd_eval_kernel() {
     fi
     [ -f "$kernel_file" ] || { fail "Kernel file not found: $kernel_file"; return 1; }
 
+    # Select baseline file based on precision
+    local baseline_file="$BASELINE"
+    if [ "$precision" != "fp32" ]; then
+        local prec_baseline="$RESULTS/baseline_level1_${precision}.json"
+        [ -f "$prec_baseline" ] && baseline_file="$prec_baseline"
+    fi
+
     "$VENV/python3" -c "
 import json, sys, time, torch
 from kernelbench.dataset import construct_kernelbench_dataset
-from kernelbench.eval import eval_kernel_against_ref
+from kernelbench.eval import eval_kernel_against_ref, get_torch_dtype_from_string
 from kernelbench.utils import set_gpu_arch
 
 torch.cuda.set_device(0)
+prec_str = '$precision'
+prec_dtype = get_torch_dtype_from_string(prec_str)
 
 # Load problem
 ds = construct_kernelbench_dataset(1, source='local')
@@ -121,11 +132,11 @@ with open('$kernel_file') as f:
     custom_code = f.read()
 
 # Load baseline
-with open('$BASELINE') as f:
+with open('$baseline_file') as f:
     base = json.load(f)
 base_ms = next((r['mean'] for r in base['results'] if r['problem_id'] == $pid and r['status'] == 'ok'), None)
 
-print(f'Problem: {$pid} ({problem.name})')
+print(f'Problem: {$pid} ({problem.name}) [{prec_str}]')
 print(f'Baseline: {base_ms:.2f} ms' if base_ms else 'Baseline: N/A')
 print(f'Kernel: $kernel_file')
 print()
@@ -141,7 +152,7 @@ try:
         num_perf_trials=100,
         device=torch.device('cuda:0'),
         backend='cuda',
-        precision=torch.float32,
+        precision=prec_dtype,
         verbose=False,
         check_for_excessive_speedup=False,
     )
@@ -232,7 +243,7 @@ READ:
   baseline <id>                Show baseline timing for a problem
 
 EVALUATE:
-  eval-kernel <file> <id>      Compile + correctness + benchmark a kernel
+  eval-kernel <file> <id> [precision]  Compile + correctness + benchmark (precision: fp32|fp16|bf16, default fp32)
 
 POWER:
   power [duration_sec]         Sample tegrastats (default 3s)
@@ -242,6 +253,7 @@ EXAMPLES:
   bash thor_agent.sh read-problem 40
   bash thor_agent.sh baseline 40
   bash thor_agent.sh eval-kernel kernels/p40_layernorm_v1.py 40
+  bash thor_agent.sh eval-kernel kernels/fp16/p25_swish.py 25 fp16
   bash thor_agent.sh power 5
 EOF
 }
@@ -251,7 +263,7 @@ case "${1:-help}" in
     health)          cmd_health ;;
     read-problem)    cmd_read_problem "${2:-}" ;;
     baseline)        cmd_baseline "${2:-}" ;;
-    eval-kernel)     cmd_eval_kernel "${2:-}" "${3:-}" ;;
+    eval-kernel)     cmd_eval_kernel "${2:-}" "${3:-}" "${4:-}" ;;
     power)           cmd_power "${2:-3}" ;;
     list-problems)   cmd_list_problems ;;
     list-kernels)    cmd_list_kernels ;;
