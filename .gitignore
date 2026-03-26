@@ -5,5 +5,7 @@ __pycache__/
 *.pyc
 .claude/
 loop_state.json
+schedule.json
+CLAUDE.md
 *.env
 .env*
