@@ -137,15 +137,21 @@
   "36": {
     "name": "RMSNorm",
     "baseline_ms": 105.0,
-    "best_ms": 41.6,
-    "best_speedup": 2.524,
-    "iterations": 1,
+    "best_ms": 41.3,
+    "best_speedup": 2.542,
+    "iterations": 2,
     "history": [
       {
         "version": 1,
         "ms": 41.6,
         "speedup": 2.524,
         "note": "1 thread/pos, 64ch into float32 regs via __ldg, float32 accumulation, 512t"
+      },
+      {
+        "version": 2,
+        "ms": 41.3,
+        "speedup": 2.542,
+        "note": "__ldcg (L2-only) for reads, bypasses L1 since data > L1, 512t"
       }
     ]
   },

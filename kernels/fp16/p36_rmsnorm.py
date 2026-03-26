@@ -7,11 +7,11 @@ cuda_source = """
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 
-// v1: 1 thread per (batch, hw) position.
-// Load 64 channels into float32 registers via __ldg (read-only cache).
-// Accumulate sum-of-squares in float32 (half overflow: max^2 = 65504^2 > FP16 range).
-// Compute inv_rms in float32, write half output.
-__global__ void rmsnorm_fp16_v1(
+// v8: __ldcg (cache in L2 only, bypass L1) for channel reads.
+// Data volume = 64*512*512*2 = 32MB >> L1 (256KB), so L1 cache is useless.
+// Bypassing L1 reduces pollution and may improve L2 hit rate for adjacent threads.
+// Use __ldcg for reads, __stcg for writes (streaming, L2 only).
+__global__ void rmsnorm_fp16_v8(
     const __half* __restrict__ x,
     __half* __restrict__ out,
     int B, int C, int HW, float eps
@@ -24,12 +24,12 @@ __global__ void rmsnorm_fp16_v1(
     const __half* row = x   + (int64_t)b * C * HW + hw;
     __half*        op = out + (int64_t)b * C * HW + hw;
 
-    // Load 64 channels into float32 registers
     float v[64];
     float sum = 0.0f;
     #pragma unroll
     for (int c = 0; c < 64; c++) {
-        v[c] = __half2float(__ldg(&row[c * HW]));
+        // __ldcg: load from global, cache in L2 only (not L1)
+        v[c] = __half2float(__ldcg(&row[c * HW]));
         sum += v[c] * v[c];
     }
 
@@ -52,7 +52,7 @@ torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps) {
     __half* op = reinterpret_cast<__half*>(out.data_ptr<at::Half>());
     int threads = 512;
     int blocks = (B * HW + threads - 1) / threads;
-    rmsnorm_fp16_v1<<<blocks, threads>>>(xp, op, B, C, HW, eps);
+    rmsnorm_fp16_v8<<<blocks, threads>>>(xp, op, B, C, HW, eps);
     return out;
 }
 """
@@ -60,7 +60,7 @@ torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps) {
 cpp_source = "torch::Tensor rmsnorm_fp16_cuda(torch::Tensor x, float eps);"
 
 module = load_inline(
-    name='rmsnorm_fp16_v1',
+    name='rmsnorm_fp16_v8',
     cpp_sources=cpp_source,
     cuda_sources=cuda_source,
     functions=['rmsnorm_fp16_cuda'],

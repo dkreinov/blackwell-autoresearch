@@ -131,6 +131,15 @@ fp16 baseline: 105.0ms (fp32 baseline: 172.0ms)
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
 | 1 | 41.60 | 2.524x | 1 thread/pos, 64ch into float32 regs via __ldg, float32 accumulation, 512t |
+| 2 | 41.30 | 2.542x | __ldcg (L2-only cache) for reads -- bypasses L1 since 64ch*512*512*2=32MB >> L1=256KB |
+
+- FAIL v2 (incorrect): 1024 threads -- v[64] float needs 64 regs/thread, 1024t = 65536 regs at SM limit, register spilling causes corruption
+- FAIL v3 (44.60ms): 256 threads -- fewer warps per block, worse latency hiding
+- DISCARD v4 (41.60ms tied): half2[32] packed channels -- identical timing to v1, bandwidth floor reached
+- FAIL v5 (205ms): warp-per-position (32 threads/pos, 2 channels/thread) -- breaks coalescing: threads access channels c*HW+lane strided by HW apart within a warp
+- FAIL v6 (48.4ms): 2 positions per thread, 256t -- doubles register pressure, register spilling to L2
+- FAIL v7 (46.5ms): 128 threads -- 6 blocks/SM but worse performance, 512t remains best
+- FLOOR: 41.6ms (2.524x). All block sizes tried (128/256/512); 512t optimal. 1024t broken (65536 register limit).
 
 ### p37 FrobeniusNorm (fp16)
 
