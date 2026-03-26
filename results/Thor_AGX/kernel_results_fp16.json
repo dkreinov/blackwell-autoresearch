@@ -137,10 +137,17 @@
   "36": {
     "name": "RMSNorm",
     "baseline_ms": 105.0,
-    "best_ms": 105.0,
-    "best_speedup": 1.0,
-    "iterations": 0,
-    "history": []
+    "best_ms": 41.6,
+    "best_speedup": 2.524,
+    "iterations": 1,
+    "history": [
+      {
+        "version": 1,
+        "ms": 41.6,
+        "speedup": 2.524,
+        "note": "1 thread/pos, 64ch into float32 regs via __ldg, float32 accumulation, 512t"
+      }
+    ]
   },
   "37": {
     "name": "FrobeniusNorm",

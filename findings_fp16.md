@@ -130,6 +130,7 @@ fp16 baseline: 105.0ms (fp32 baseline: 172.0ms)
 
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
+| 1 | 41.60 | 2.524x | 1 thread/pos, 64ch into float32 regs via __ldg, float32 accumulation, 512t |
 
 ### p37 FrobeniusNorm (fp16)
 
@@ -146,6 +147,9 @@ fp16 baseline: 117.0ms (fp32 baseline: 193.0ms)
 |---------|-----------|---------|--------|
 | 1 | 51.70 | 2.263x | fused 2-pass L2-reuse, scalar __half loads, float32 accumulation, 8x unroll, 1024t |
 | 2 | 42.00 | 2.786x | half2 packing via __halves2half2, __habs2, 4x half2 unroll, 1024t |
+
+- FAIL v3 (42.80ms): branch on row parity for direct half2 loads on even rows -- no improvement, memory bandwidth bound not instruction bound
+- FAIL v4 (43.20ms): 8x half2 unroll -- extra register pressure outweighs ILP gain, kernel near bandwidth floor
 
 ### p39 L2Norm (fp16)
 
