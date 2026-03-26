@@ -831,6 +831,7 @@ fp16 baseline: 117.0ms (fp32 baseline: 193.0ms)
 | Version | Time (ms) | Speedup | Change |
 |---------|-----------|---------|--------|
 | 1 | 51.70 | 2.263x | fused 2-pass L2-reuse, scalar __half loads, float32 accumulation, 8x unroll, 1024t |
+| 2 | 42.00 | 2.786x | half2 packing via __halves2half2, __habs2, 4x half2 unroll, 1024t |
 
 ### p39 L2Norm (fp16)
 

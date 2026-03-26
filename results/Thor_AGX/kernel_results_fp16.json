@@ -153,15 +153,21 @@
   "38": {
     "name": "L1Norm",
     "baseline_ms": 117.0,
-    "best_ms": 51.7,
-    "best_speedup": 2.263,
-    "iterations": 1,
+    "best_ms": 42.0,
+    "best_speedup": 2.786,
+    "iterations": 2,
     "history": [
       {
         "version": 1,
         "ms": 51.7,
         "speedup": 2.263,
         "note": "fused 2-pass L2-reuse, scalar __half loads, float32 accumulation, 8x unroll, 1024t"
+      },
+      {
+        "version": 2,
+        "ms": 42.0,
+        "speedup": 2.786,
+        "note": "half2 packing via __halves2half2, __habs2, 4x half2 unroll, 1024t"
       }
     ]
   },
